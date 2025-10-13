@@ -37,6 +37,13 @@ echo -e "${BLUE}📋 Copying executable to ~/.local/bin/dbi${NC}"
 cp target/release/dbi-backend-rust ~/.local/bin/dbi
 chmod +x ~/.local/bin/dbi
 
+# Install desktop file
+echo -e "${BLUE}🖥️  Installing desktop entry${NC}"
+mkdir -p ~/.local/share/applications
+cp dbi-backend-rust.desktop ~/.local/share/applications/dbi.desktop
+chmod +x ~/.local/share/applications/dbi.desktop
+update-desktop-database ~/.local/share/applications/ 2>/dev/null || true
+
 # Check if ~/.local/bin is in PATH
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo ""
@@ -54,11 +61,13 @@ echo ""
 echo -e "${GREEN}✅ Installation complete!${NC}"
 echo ""
 echo "📊 Details:"
-echo "   Location: ~/.local/bin/dbi"
+echo "   Executable: ~/.local/bin/dbi"
+echo "   Desktop Entry: ~/.local/share/applications/dbi.desktop"
 echo "   Size: $SIZE"
 echo ""
 echo "🚀 Usage:"
-echo "   dbi              # Launch GUI"
-echo "   dbi --cli        # Launch CLI"
+echo "   dbi              # Launch GUI from terminal"
+echo "   dbi --cli        # Launch CLI mode"
+echo "   Or search 'DBI Backend' in your application menu"
 echo ""
 echo "🎮 Ready to transfer games to your Nintendo Switch!"

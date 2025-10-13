@@ -1,10 +1,12 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=DBI Backend Rust
+Name=DBI Backend
 Comment=High-performance Nintendo Switch DBI backend with eGUI interface
-Exec=/home/bundit/.local/bin/dbi-backend-rust
+Exec=/home/bundit/.local/bin/dbi
 Icon=input-gaming
-Categories=Game;Utility;
+Categories=Utility;
 Terminal=false
-StartupWMClass=DBI Backend - Rust Edition
+StartupWMClass=dbi-backend-rust
+Keywords=Nintendo;Switch;DBI;Install;Games;NSP;
+StartupNotify=true
