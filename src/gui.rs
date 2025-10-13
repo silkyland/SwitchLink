@@ -110,7 +110,7 @@ impl eframe::App for DbiApp {
         // Top panel - Controls
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("🎮 DBI Backend - Rust Edition");
+                ui.heading("🎮 DBI Backend");
                 ui.separator();
                 
                 // Server controls
@@ -151,6 +151,7 @@ impl eframe::App for DbiApp {
                 
                 // Right - Instructions
                 columns[1].vertical(|ui| {
+                    ui.add_space(10.0); // Add spacing from top
                     ui.heading("ℹ Instructions");
                     ui.label("1. Add NSP/NSZ/XCI/XCZ files or folders");
                     ui.label("2. Connect your Nintendo Switch via USB");
@@ -375,8 +376,8 @@ impl DbiApp {
                                     }
                                 }
                                 
-                                // Delete button
-                                if ui.small_button("✕").on_hover_text("Remove from library").clicked() {
+                                // Delete button with trash icon
+                                if ui.small_button("🗑").on_hover_text("Remove from library").clicked() {
                                     if let Some(db) = &self.database {
                                         let _ = db.remove_file(file.id);
                                         self.reload_file_list();
@@ -437,12 +438,12 @@ pub fn launch_gui() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 720.0]) // 16:9 aspect ratio
-            .with_title("DBI Backend - Rust Edition"),
+            .with_title("DBI Backend"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "DBI Backend - Rust Edition",
+        "DBI Backend",
         options,
         Box::new(|_cc| Box::new(DbiApp::new())),
     ).unwrap();
