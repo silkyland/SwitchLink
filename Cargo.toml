@@ -41,6 +41,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # Utilities
 bytes = "1.5"
 dirs = "5.0"
+open = "5.0"
 
 [profile.release]
 opt-level = 3

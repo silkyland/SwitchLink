@@ -101,10 +101,38 @@ impl DbiApp {
 }
 
 impl eframe::App for DbiApp {
-    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
         // Request repaint continuously when server is running for smooth progress updates
         if self.server_running {
             ctx.request_repaint();
+        }
+        
+        // Check for close request and show confirmation if transfer is in progress
+        if ctx.input(|i| i.viewport().close_requested()) {
+            if self.server_running {
+                // Show confirmation dialog
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                
+                egui::Window::new("⚠️ Confirm Close")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                    .show(ctx, |ui| {
+                        ui.label("Transfer is in progress!");
+                        ui.label("Are you sure you want to close?");
+                        ui.separator();
+                        
+                        ui.horizontal(|ui| {
+                            if ui.button("Yes, Close").clicked() {
+                                self.stop_server();
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                            if ui.button("Cancel").clicked() {
+                                // Just close the dialog
+                            }
+                        });
+                    });
+            }
         }
         
         // Top panel - Controls
@@ -138,6 +166,13 @@ impl eframe::App for DbiApp {
                 
                 ui.separator();
                 ui.label("Built with Rust");
+                
+                // Buy me a coffee button
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("☕ Buy me a coffee").clicked() {
+                        let _ = open::that("https://buymeacoffee.com/silkyland");
+                    }
+                });
             });
         });
         
@@ -365,19 +400,28 @@ impl DbiApp {
                         // Actions column
                         row.col(|ui| {
                             ui.horizontal(|ui| {
-                                // Add to queue button
-                                if ui.small_button("+").on_hover_text("Add to queue").clicked() {
-                                    let path = PathBuf::from(&file.path);
-                                    if path.exists() {
-                                        self.file_list.insert(file.filename.clone(), path);
-                                        self.log_messages.push(format!("[+] Added to queue: {}", file.filename));
+                                // Add/Remove from queue button
+                                let in_queue = self.file_list.contains_key(&file.filename);
+                                let button_text = if in_queue { "-" } else { "+" };
+                                let tooltip = if in_queue { "Remove from queue" } else { "Add to queue" };
+                                
+                                if ui.small_button(button_text).on_hover_text(tooltip).clicked() {
+                                    if in_queue {
+                                        self.file_list.remove(&file.filename);
+                                        self.log_messages.push(format!("[-] Removed from queue: {}", file.filename));
                                     } else {
-                                        self.log_messages.push(format!("[!] File not found: {}", file.filename));
+                                        let path = PathBuf::from(&file.path);
+                                        if path.exists() {
+                                            self.file_list.insert(file.filename.clone(), path);
+                                            self.log_messages.push(format!("[+] Added to queue: {}", file.filename));
+                                        } else {
+                                            self.log_messages.push(format!("[!] File not found: {}", file.filename));
+                                        }
                                     }
                                 }
                                 
-                                // Delete button with trash icon
-                                if ui.small_button("🗑").on_hover_text("Remove from library").clicked() {
+                                // Delete button
+                                if ui.small_button("Del").on_hover_text("Remove from library").clicked() {
                                     if let Some(db) = &self.database {
                                         let _ = db.remove_file(file.id);
                                         self.reload_file_list();
@@ -438,12 +482,12 @@ pub fn launch_gui() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 720.0]) // 16:9 aspect ratio
-            .with_title("DBI Backend"),
+            .with_title("DBI Backend - Rust Edition"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "DBI Backend",
+        "DBI Backend - Rust Edition",
         options,
         Box::new(|_cc| Box::new(DbiApp::new())),
     ).unwrap();
