@@ -109,7 +109,6 @@ impl eframe::App for DbiApp {
         
         CentralPanel::default().show(ctx, |ui| {
             ui.heading("🎮 DBI Backend - Rust Edition");
-            ui.label("🚀 eGUI Version - Works perfectly in Linux!");
 
             ui.separator();
 
@@ -126,10 +125,16 @@ impl eframe::App for DbiApp {
                 });
             });
 
-            // Footer
+            // Activity Log at bottom
             ui.separator();
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label("Built with eGUI 🦀 | Native Linux performance");
+            self.activity_log_panel(ui);
+            
+            // Footer - Status bar
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label("v0.1.0");
+                ui.separator();
+                ui.label("Built with Rust 🦀");
             });
         });
     }
@@ -408,10 +413,9 @@ impl DbiApp {
         ui.label("3. Launch DBI on your Switch");
         ui.label("4. Select 'Install title from DBIbackend'");
         ui.label("5. Click 'Start Server' above");
-
-        ui.separator();
-
-        // Activity Log
+    }
+    
+    fn activity_log_panel(&mut self, ui: &mut Ui) {
         ui.heading("Activity Log");
         
         // Get logs from progress
@@ -426,11 +430,23 @@ impl DbiApp {
             }
         }
         
-        ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
-            for msg in self.log_messages.iter().rev().take(20) {
-                ui.label(msg);
-            }
-        });
+        // Terminal-style log box
+        egui::Frame::none()
+            .fill(egui::Color32::from_rgb(20, 20, 20))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)))
+            .inner_margin(8.0)
+            .show(ui, |ui| {
+                ScrollArea::vertical()
+                    .max_height(120.0)
+                    .stick_to_bottom(true)
+                    .show(ui, |ui| {
+                        ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
+                        
+                        for msg in self.log_messages.iter().rev().take(30) {
+                            ui.colored_label(egui::Color32::from_rgb(200, 200, 200), msg);
+                        }
+                    });
+            });
     }
 }
 
