@@ -107,36 +107,102 @@ impl eframe::App for DbiApp {
             ctx.request_repaint();
         }
         
-        CentralPanel::default().show(ctx, |ui| {
-            ui.heading("🎮 DBI Backend - Rust Edition");
-
-            ui.separator();
-
-            // Two-panel layout
-            ui.columns(2, |columns| {
-                // Left panel - File Queue
-                columns[0].vertical(|ui| {
-                    self.file_panel(ui);
-                });
-
-                // Right panel - Server Control
-                columns[1].vertical(|ui| {
-                    self.server_panel(ui);
-                });
+        // Top panel - Controls
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading("🎮 DBI Backend - Rust Edition");
+                ui.separator();
+                
+                // Server controls
+                if ui.button("▶ Start Server").clicked() {
+                    self.start_server();
+                }
+                if ui.button("■ Stop Server").clicked() {
+                    self.stop_server();
+                }
             });
-
-            // Activity Log at bottom
-            ui.separator();
-            self.activity_log_panel(ui);
         });
         
-        // Footer - Status bar at the very bottom
+        // Bottom panel - Status bar
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("v0.1.0");
                 ui.separator();
+                
+                // Connection status
+                let status_color = match self.server_running {
+                    true => egui::Color32::GREEN,
+                    false => egui::Color32::RED,
+                };
+                ui.colored_label(status_color, &self.connection_status);
+                
+                ui.separator();
                 ui.label("Built with Rust");
             });
+        });
+        
+        // Bottom panel for Activity Log and Instructions
+        egui::TopBottomPanel::bottom("activity_panel").min_height(200.0).show(ctx, |ui| {
+            ui.columns(2, |columns| {
+                // Left - Activity Log
+                columns[0].vertical(|ui| {
+                    self.activity_log_panel(ui);
+                });
+                
+                // Right - Instructions
+                columns[1].vertical(|ui| {
+                    ui.heading("ℹ Instructions");
+                    ui.label("1. Add NSP/NSZ/XCI/XCZ files or folders");
+                    ui.label("2. Connect your Nintendo Switch via USB");
+                    ui.label("3. Launch DBI on your Switch");
+                    ui.label("4. Select 'Install title from DBIbackend'");
+                    ui.label("5. Click 'Start Server' above");
+                    
+                    ui.separator();
+                    
+                    // Transfer Progress
+                    if self.server_running {
+                        if let Ok(progress) = self.progress.lock() {
+                            ui.heading("▶ Transfer Progress");
+                            
+                            if !progress.current_file.is_empty() {
+                                ui.label(format!("• File: {}", progress.current_file));
+                            }
+                            
+                            let progress_ratio = if progress.total_size > 0 {
+                                progress.bytes_sent as f32 / progress.total_size as f32
+                            } else {
+                                0.0
+                            };
+                            
+                            ui.add(ProgressBar::new(progress_ratio)
+                                .text(format!("{:.1}%", progress_ratio * 100.0)));
+                            
+                            ui.horizontal(|ui| {
+                                ui.label(format!("↑ Sent: {}", format_file_size(progress.bytes_sent)));
+                                ui.label(format!("/ {}", format_file_size(progress.total_size)));
+                            });
+                            
+                            if progress.speed_mbps > 0.0 {
+                                ui.label(format!("⚡ Speed: {:.2} MB/s", progress.speed_mbps));
+                                
+                                if progress.total_size > progress.bytes_sent && progress.speed_mbps > 0.0 {
+                                    let remaining_bytes = progress.total_size - progress.bytes_sent;
+                                    let remaining_seconds = (remaining_bytes as f64 / (progress.speed_mbps * 1_000_000.0)) as u64;
+                                    let minutes = remaining_seconds / 60;
+                                    let seconds = remaining_seconds % 60;
+                                    ui.label(format!("⏱ ETA: {}m {}s", minutes, seconds));
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Central panel - File Library (full width)
+        CentralPanel::default().show(ctx, |ui| {
+            self.file_panel(ui);
         });
     }
 }
@@ -328,94 +394,6 @@ impl DbiApp {
         // Reload file list from database
         // This will be called after any database operation
     }
-
-    fn server_panel(&mut self, ui: &mut Ui) {
-        ui.heading("⚙ Server Control");
-
-        // Status indicator
-        let status_color = match self.server_running {
-            true => egui::Color32::GREEN,
-            false => egui::Color32::RED,
-        };
-
-        ui.horizontal(|ui| {
-            ui.label("Status:");
-            ui.colored_label(status_color, &self.connection_status);
-            
-            // Show reconnecting indicator
-            if self.server_running {
-                ui.label("|");
-                ui.spinner();
-            }
-        });
-
-        ui.separator();
-
-        // Progress bar and transfer stats
-        if self.server_running {
-            if let Ok(progress) = self.progress.lock() {
-                ui.heading("▶ Transfer Progress");
-                
-                // Current file being transferred
-                if !progress.current_file.is_empty() {
-                    ui.label(format!("• File: {}", progress.current_file));
-                }
-                
-                // Progress bar
-                let progress_ratio = if progress.total_size > 0 {
-                    progress.bytes_sent as f32 / progress.total_size as f32
-                } else {
-                    0.0
-                };
-                
-                ui.add(ProgressBar::new(progress_ratio)
-                    .text(format!("{:.1}%", progress_ratio * 100.0)));
-                
-                // Transfer stats
-                ui.horizontal(|ui| {
-                    ui.label(format!("↑ Sent: {}", format_file_size(progress.bytes_sent)));
-                    ui.label(format!("/ {}", format_file_size(progress.total_size)));
-                });
-                
-                // Speed
-                if progress.speed_mbps > 0.0 {
-                    ui.label(format!("⚡ Speed: {:.2} MB/s", progress.speed_mbps));
-                    
-                    // ETA
-                    if progress.total_size > progress.bytes_sent && progress.speed_mbps > 0.0 {
-                        let remaining_bytes = progress.total_size - progress.bytes_sent;
-                        let remaining_seconds = (remaining_bytes as f64 / (progress.speed_mbps * 1_000_000.0)) as u64;
-                        let minutes = remaining_seconds / 60;
-                        let seconds = remaining_seconds % 60;
-                        ui.label(format!("⏱ ETA: {}m {}s", minutes, seconds));
-                    }
-                }
-                
-                ui.separator();
-            }
-        }
-
-        // Server controls
-        ui.vertical_centered(|ui| {
-            if ui.button("▶ Start Server").clicked() {
-                self.start_server();
-            }
-
-            if ui.button("■ Stop Server").clicked() {
-                self.stop_server();
-            }
-        });
-
-        ui.separator();
-
-        // Instructions
-        ui.heading("ℹ Instructions");
-        ui.label("1. Add NSP/NSZ/XCI/XCZ files or folders");
-        ui.label("2. Connect your Nintendo Switch via USB");
-        ui.label("3. Launch DBI on your Switch");
-        ui.label("4. Select 'Install title from DBIbackend'");
-        ui.label("5. Click 'Start Server' above");
-    }
     
     fn activity_log_panel(&mut self, ui: &mut Ui) {
         ui.heading("Activity Log");
@@ -432,8 +410,8 @@ impl DbiApp {
             }
         }
         
-        // Terminal-style log box - use available height
-        let available_height = ui.available_height() - 30.0; // Reserve space for status bar
+        // Terminal-style log box - fill available space
+        let available_height = ui.available_height();
         
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(20, 20, 20))
@@ -443,6 +421,7 @@ impl DbiApp {
                 ScrollArea::vertical()
                     .max_height(available_height)
                     .stick_to_bottom(true)
+                    .auto_shrink([false, false])
                     .show(ui, |ui| {
                         ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
                         
