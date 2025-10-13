@@ -2,6 +2,12 @@
 name = "dbi-backend-rust"
 version = "0.1.0"
 edition = "2021"
+authors = ["Bundit Nuntates <bundit.nu@gmail.com>"]
+license = "MIT"
+description = "High-performance Nintendo Switch DBI backend with modern GUI"
+repository = "https://github.com/silkyland/dbi-server-rust"
+keywords = ["nintendo-switch", "dbi", "usb", "gui", "installer"]
+categories = ["games", "gui"]
 
 [dependencies]
 # USB communication

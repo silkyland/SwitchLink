@@ -105,6 +105,12 @@ rust-dbi/
 └── README.md             # This file
 ```
 
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details
+
+Copyright (c) 2025 Bundit Nuntates
+
 ---
 
 **🎮 Perfect for Linux users who want a reliable, high-performance DBI backend!**
