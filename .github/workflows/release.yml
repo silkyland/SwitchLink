@@ -38,14 +38,12 @@ jobs:
             asset_name: dbi-backend-macos-arm64
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
+          targets: ${{ matrix.target }}
       
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -54,10 +52,7 @@ jobs:
           sudo apt-get install -y libusb-1.0-0-dev pkg-config
       
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
       
       - name: Strip binary (Linux/macOS)
         if: matrix.os != 'windows-latest'
@@ -68,7 +63,7 @@ jobs:
           mv target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.asset_name }}
@@ -79,20 +74,21 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            dbi-backend-linux-x64/dbi-backend-linux-x64
-            dbi-backend-windows-x64.exe/dbi-backend-windows-x64.exe
-            dbi-backend-macos-x64/dbi-backend-macos-x64
-            dbi-backend-macos-arm64/dbi-backend-macos-arm64
+            artifacts/dbi-backend-linux-x64/dbi-backend-linux-x64
+            artifacts/dbi-backend-windows-x64.exe/dbi-backend-windows-x64.exe
+            artifacts/dbi-backend-macos-x64/dbi-backend-macos-x64
+            artifacts/dbi-backend-macos-arm64/dbi-backend-macos-arm64
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
