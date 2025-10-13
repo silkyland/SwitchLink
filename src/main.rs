@@ -3,6 +3,7 @@ mod cli;
 mod file_manager;
 mod usb;
 mod protocol;
+mod database;
 
 fn main() {
     // Initialize logging with DEBUG level to see detailed protocol communication

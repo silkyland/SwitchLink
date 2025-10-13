@@ -224,7 +224,32 @@ impl DbiServer {
     }
     
     fn poll_commands(&mut self) -> Result<()> {
+        let mut reconnect_attempts = 0;
+        const MAX_RECONNECT_ATTEMPTS: u32 = 3;
+        
         while *self.running.lock().unwrap() {
+            // Check connection and try to reconnect if needed
+            if self.connection.is_none() && reconnect_attempts < MAX_RECONNECT_ATTEMPTS {
+                warn!("Connection lost, attempting to reconnect... (attempt {}/{})", 
+                      reconnect_attempts + 1, MAX_RECONNECT_ATTEMPTS);
+                
+                match self.connect() {
+                    Ok(_) => {
+                        info!("Reconnected successfully!");
+                        reconnect_attempts = 0;
+                    }
+                    Err(e) => {
+                        reconnect_attempts += 1;
+                        error!("Reconnect failed: {}", e);
+                        if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
+                            return Err(anyhow!("Failed to reconnect after {} attempts", MAX_RECONNECT_ATTEMPTS));
+                        }
+                        std::thread::sleep(Duration::from_secs(2));
+                        continue;
+                    }
+                }
+            }
+            
             let header_result = {
                 let conn = self.connection.as_ref().unwrap();
                 conn.read_command_header()
@@ -232,6 +257,7 @@ impl DbiServer {
             
             match header_result {
                 Ok(header) => {
+                    reconnect_attempts = 0; // Reset on successful read
                     debug!("Received command: type={}, id={}, size={}",
                            header.cmd_type, header.cmd_id, header.data_size);
                     
@@ -266,8 +292,10 @@ impl DbiServer {
                                 continue;
                             }
                             rusb::Error::NoDevice => {
-                                error!("Switch disconnected");
-                                return Err(anyhow!("Switch disconnected"));
+                                warn!("Switch disconnected, will try to reconnect...");
+                                self.connection = None;
+                                std::thread::sleep(Duration::from_secs(1));
+                                continue;
                             }
                             _ => {
                                 error!("USB error: {}", e);

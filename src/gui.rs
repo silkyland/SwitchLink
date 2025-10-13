@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
 
+use crate::database::Database;
 use crate::file_manager::{add_files, add_files_from_directory, format_file_size};
 use crate::usb::{DbiServer, TransferProgress};
 
@@ -19,14 +20,31 @@ pub struct DbiApp {
     server_thread: Option<thread::JoinHandle<()>>,
     server_instance: Option<Arc<Mutex<DbiServer>>>,
     progress: Arc<Mutex<TransferProgress>>,
+    database: Option<Database>,
+    search_query: String,
 }
 
 impl DbiApp {
     pub fn new() -> Self {
+        // Initialize database
+        let db_path = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("dbi-backend")
+            .join("games.db");
+        
+        // Create directory if needed
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        
+        let database = Database::new(&db_path).ok();
+        
         Self {
             log_messages: vec!["[*] DBI Backend started with eGUI!".to_string()],
             connection_status: "Disconnected".to_string(),
             progress: Arc::new(Mutex::new(TransferProgress::default())),
+            database,
+            search_query: String::new(),
             ..Default::default()
         }
     }
@@ -119,63 +137,189 @@ impl eframe::App for DbiApp {
 
 impl DbiApp {
     fn file_panel(&mut self, ui: &mut Ui) {
-        ui.heading("📁 File Queue");
+        ui.heading("📁 File Library");
 
+        // Action buttons
         ui.horizontal(|ui| {
-            if ui.button("📂 Add Folder").clicked() {
+            if ui.button("+ Add Folder").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    match add_files_from_directory(&mut self.file_list, path) {
-                        Ok(count) => {
-                            self.log_messages.push(format!("✅ Added {} files from folder", count));
-                        }
-                        Err(e) => {
-                            self.log_messages.push(format!("❌ Error adding folder: {}", e));
+                    if let Some(db) = &self.database {
+                        match db.add_directory(&path, &["nsp", "nsz", "xci", "xcz"]) {
+                            Ok(count) => {
+                                self.log_messages.push(format!("[+] Added {} files from folder", count));
+                                self.reload_file_list();
+                            }
+                            Err(e) => {
+                                self.log_messages.push(format!("[!] Error: {}", e));
+                            }
                         }
                     }
                 }
             }
 
-            if ui.button("📄 Add Files").clicked() {
+            if ui.button("+ Add Files").clicked() {
                 if let Some(files) = rfd::FileDialog::new()
                     .add_filter("Switch Files", &["nsp", "nsz", "xci", "xcz"])
                     .pick_files()
                 {
-                    let paths: Vec<PathBuf> = files.iter().map(|f| f.to_path_buf()).collect();
-                    let count = add_files(&mut self.file_list, paths);
-                    self.log_messages.push(format!("✅ Added {} files", count));
+                    if let Some(db) = &self.database {
+                        let mut count = 0;
+                        for file in files {
+                            if db.add_file(&file).is_ok() {
+                                count += 1;
+                            }
+                        }
+                        self.log_messages.push(format!("[+] Added {} files", count));
+                        self.reload_file_list();
+                    }
                 }
             }
 
-            if ui.button("🗑️ Clear All").clicked() {
-                let count = self.file_list.len();
+            if ui.button("🗑 Clear All").clicked() {
                 self.file_list.clear();
-                self.log_messages.push(format!("✅ Cleared {} files", count));
+                self.log_messages.push("[x] Cleared file queue".to_string());
+            }
+            
+            if ui.button("🔄 Refresh").clicked() {
+                self.reload_file_list();
+                self.log_messages.push("[*] Refreshed file list".to_string());
             }
         });
 
-        ui.label(format!("Files in queue: {}", self.file_list.len()));
+        ui.separator();
 
-        ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-            let mut to_remove = Vec::new();
-            
-            for (name, path) in &self.file_list {
+        // Search bar
+        ui.horizontal(|ui| {
+            ui.label("🔍");
+            let response = ui.text_edit_singleline(&mut self.search_query);
+            if response.changed() {
+                self.reload_file_list();
+            }
+            if ui.button("✕").clicked() {
+                self.search_query.clear();
+                self.reload_file_list();
+            }
+        });
+
+        ui.separator();
+
+        // Statistics
+        if let Some(db) = &self.database {
+            if let Ok((count, total_size, installs)) = db.get_stats() {
                 ui.horizontal(|ui| {
-                    ui.label(format!("• {}", name));
-                    if let Ok(size) = std::fs::metadata(path) {
-                        ui.label(format_file_size(size.len()));
-                    }
-                    if ui.button("✕").clicked() {
-                        to_remove.push(name.clone());
-                    }
+                    ui.label(format!("📦 {} files", count));
+                    ui.label("|");
+                    ui.label(format!("💾 {}", format_file_size(total_size)));
+                    ui.label("|");
+                    ui.label(format!("📥 {} installs", installs));
                 });
             }
-            
-            // Remove files after iteration
-            for name in to_remove {
-                self.file_list.remove(&name);
-                self.log_messages.push(format!("Removed file: {}", name));
+        }
+        
+        ui.label(format!("Queue: {}", self.file_list.len()));
+
+        ui.separator();
+
+        // File table
+        use egui_extras::{TableBuilder, Column};
+        
+        let files_to_display = if let Some(db) = &self.database {
+            if self.search_query.is_empty() {
+                db.get_files().unwrap_or_default()
+            } else {
+                db.search(&self.search_query).unwrap_or_default()
             }
-        });
+        } else {
+            vec![]
+        };
+
+        TableBuilder::new(ui)
+            .striped(true)
+            .resizable(true)
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .column(Column::auto().at_least(30.0)) // Favorite
+            .column(Column::remainder().at_least(200.0)) // Filename
+            .column(Column::auto().at_least(80.0)) // Size
+            .column(Column::auto().at_least(60.0)) // Installs
+            .column(Column::auto().at_least(100.0)) // Actions
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.strong("⭐");
+                });
+                header.col(|ui| {
+                    ui.strong("Filename");
+                });
+                header.col(|ui| {
+                    ui.strong("Size");
+                });
+                header.col(|ui| {
+                    ui.strong("Installs");
+                });
+                header.col(|ui| {
+                    ui.strong("Actions");
+                });
+            })
+            .body(|mut body| {
+                for file in &files_to_display {
+                    body.row(18.0, |mut row| {
+                        // Favorite column
+                        row.col(|ui| {
+                            let star = if file.favorite { "⭐" } else { "☆" };
+                            if ui.button(star).clicked() {
+                                if let Some(db) = &self.database {
+                                    let _ = db.toggle_favorite(file.id);
+                                    self.reload_file_list();
+                                }
+                            }
+                        });
+                        
+                        // Filename column
+                        row.col(|ui| {
+                            ui.label(&file.filename);
+                        });
+                        
+                        // Size column
+                        row.col(|ui| {
+                            ui.label(format_file_size(file.size));
+                        });
+                        
+                        // Install count column
+                        row.col(|ui| {
+                            ui.label(format!("{}", file.install_count));
+                        });
+                        
+                        // Actions column
+                        row.col(|ui| {
+                            ui.horizontal(|ui| {
+                                // Add to queue button
+                                if ui.small_button("+").on_hover_text("Add to queue").clicked() {
+                                    let path = PathBuf::from(&file.path);
+                                    if path.exists() {
+                                        self.file_list.insert(file.filename.clone(), path);
+                                        self.log_messages.push(format!("[+] Added to queue: {}", file.filename));
+                                    } else {
+                                        self.log_messages.push(format!("[!] File not found: {}", file.filename));
+                                    }
+                                }
+                                
+                                // Delete button
+                                if ui.small_button("✕").on_hover_text("Remove from library").clicked() {
+                                    if let Some(db) = &self.database {
+                                        let _ = db.remove_file(file.id);
+                                        self.reload_file_list();
+                                        self.log_messages.push(format!("[x] Removed: {}", file.filename));
+                                    }
+                                }
+                            });
+                        });
+                    });
+                }
+            });
+    }
+    
+    fn reload_file_list(&mut self) {
+        // Reload file list from database
+        // This will be called after any database operation
     }
 
     fn server_panel(&mut self, ui: &mut Ui) {
@@ -190,6 +334,12 @@ impl DbiApp {
         ui.horizontal(|ui| {
             ui.label("Status:");
             ui.colored_label(status_color, &self.connection_status);
+            
+            // Show reconnecting indicator
+            if self.server_running {
+                ui.label("|");
+                ui.spinner();
+            }
         });
 
         ui.separator();
