@@ -179,7 +179,7 @@ impl DbiApp {
     }
 
     fn server_panel(&mut self, ui: &mut Ui) {
-        ui.heading("⚙️ Server Control");
+        ui.heading("⚙ Server Control");
 
         // Status indicator
         let status_color = match self.server_running {
@@ -197,11 +197,11 @@ impl DbiApp {
         // Progress bar and transfer stats
         if self.server_running {
             if let Ok(progress) = self.progress.lock() {
-                ui.heading("📊 Transfer Progress");
+                ui.heading("▶ Transfer Progress");
                 
                 // Current file being transferred
                 if !progress.current_file.is_empty() {
-                    ui.label(format!("📄 File: {}", progress.current_file));
+                    ui.label(format!("• File: {}", progress.current_file));
                 }
                 
                 // Progress bar
@@ -216,7 +216,7 @@ impl DbiApp {
                 
                 // Transfer stats
                 ui.horizontal(|ui| {
-                    ui.label(format!("📦 Sent: {}", format_file_size(progress.bytes_sent)));
+                    ui.label(format!("↑ Sent: {}", format_file_size(progress.bytes_sent)));
                     ui.label(format!("/ {}", format_file_size(progress.total_size)));
                 });
                 
@@ -230,7 +230,7 @@ impl DbiApp {
                         let remaining_seconds = (remaining_bytes as f64 / (progress.speed_mbps * 1_000_000.0)) as u64;
                         let minutes = remaining_seconds / 60;
                         let seconds = remaining_seconds % 60;
-                        ui.label(format!("⏱️ ETA: {}m {}s", minutes, seconds));
+                        ui.label(format!("⏱ ETA: {}m {}s", minutes, seconds));
                     }
                 }
                 
@@ -252,7 +252,7 @@ impl DbiApp {
         ui.separator();
 
         // Instructions
-        ui.heading("📋 Instructions");
+        ui.heading("ℹ Instructions");
         ui.label("1. Add NSP/NSZ/XCI/XCZ files or folders");
         ui.label("2. Connect your Nintendo Switch via USB");
         ui.label("3. Launch DBI on your Switch");
@@ -262,7 +262,7 @@ impl DbiApp {
         ui.separator();
 
         // Activity Log
-        ui.heading("📝 Activity Log");
+        ui.heading("≡ Activity Log");
         
         // Get logs from progress
         if let Ok(progress) = self.progress.lock() {
