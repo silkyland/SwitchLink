@@ -1,0 +1,42 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Logs
+*.log
+/logs/
+
+# Build artifacts
+/release/
+/debug/
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test files
+/test_files/
+/tmp/
+
+# Config (if sensitive)
+# config.toml
+# *.config

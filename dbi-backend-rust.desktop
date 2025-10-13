@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DBI Backend Rust
+Comment=High-performance Nintendo Switch DBI backend with eGUI interface
+Exec=/home/bundit/.local/bin/dbi-backend-rust
+Icon=input-gaming
+Categories=Game;Utility;
+Terminal=false
+StartupWMClass=DBI Backend - Rust Edition

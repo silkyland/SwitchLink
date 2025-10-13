@@ -1,0 +1,38 @@
+[package]
+name = "dbi-backend-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# USB communication
+rusb = "0.9"
+
+# GUI framework - eGUI (works great in Linux!)
+eframe = "0.27"  # eGUI framework
+egui = "0.27"
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# File dialog
+rfd = "0.14"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+# Utilities
+bytes = "1.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
