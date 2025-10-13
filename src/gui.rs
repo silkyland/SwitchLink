@@ -24,7 +24,7 @@ pub struct DbiApp {
 impl DbiApp {
     pub fn new() -> Self {
         Self {
-            log_messages: vec!["🦀 DBI Backend started with eGUI!".to_string()],
+            log_messages: vec!["[*] DBI Backend started with eGUI!".to_string()],
             connection_status: "Disconnected".to_string(),
             progress: Arc::new(Mutex::new(TransferProgress::default())),
             ..Default::default()
@@ -33,7 +33,7 @@ impl DbiApp {
 
     fn start_server(&mut self) {
         if self.file_list.is_empty() {
-            self.log_messages.push("❌ Please add files first".to_string());
+            self.log_messages.push("[!] Please add files first".to_string());
             return;
         }
 
@@ -63,8 +63,8 @@ impl DbiApp {
         self.server_thread = Some(handle);
         self.server_running = true;
         self.connection_status = "Connected".to_string();
-        self.log_messages.push("🚀 Starting DBI server...".to_string());
-        self.log_messages.push("📋 Connect your Switch and select 'Install title from DBIbackend'".to_string());
+        self.log_messages.push("[>] Starting DBI server...".to_string());
+        self.log_messages.push("[i] Connect your Switch and select 'Install title from DBIbackend'".to_string());
     }
 
     fn stop_server(&mut self) {
@@ -76,7 +76,7 @@ impl DbiApp {
         
         self.server_running = false;
         self.connection_status = "Disconnected".to_string();
-        self.log_messages.push("⏹️ Server stopped".to_string());
+        self.log_messages.push("[x] Server stopped".to_string());
         self.server_thread = None;
         self.server_instance = None;
     }
@@ -240,11 +240,11 @@ impl DbiApp {
 
         // Server controls
         ui.vertical_centered(|ui| {
-            if ui.button("▶️ Start Server").clicked() {
+            if ui.button("▶ Start Server").clicked() {
                 self.start_server();
             }
 
-            if ui.button("⏹️ Stop Server").clicked() {
+            if ui.button("■ Stop Server").clicked() {
                 self.stop_server();
             }
         });
@@ -262,7 +262,7 @@ impl DbiApp {
         ui.separator();
 
         // Activity Log
-        ui.heading("≡ Activity Log");
+        ui.heading("Activity Log");
         
         // Get logs from progress
         if let Ok(progress) = self.progress.lock() {

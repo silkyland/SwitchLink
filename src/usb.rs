@@ -391,7 +391,7 @@ impl DbiServer {
                         }
                     }
                     
-                    p.add_log(format!("📄 Transferring: {}", file_range.nsp_name));
+                    p.add_log(format!("[>] Transferring: {}", file_range.nsp_name));
                 }
             }
         }
