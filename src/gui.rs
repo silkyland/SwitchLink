@@ -128,13 +128,14 @@ impl eframe::App for DbiApp {
             // Activity Log at bottom
             ui.separator();
             self.activity_log_panel(ui);
-            
-            // Footer - Status bar
-            ui.separator();
+        });
+        
+        // Footer - Status bar at the very bottom
+        egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("v0.1.0");
                 ui.separator();
-                ui.label("Built with Rust 🦀");
+                ui.label("Built with Rust");
             });
         });
     }
@@ -142,7 +143,7 @@ impl eframe::App for DbiApp {
 
 impl DbiApp {
     fn file_panel(&mut self, ui: &mut Ui) {
-        ui.heading("📁 File Library");
+        ui.heading("File Library");
 
         // Action buttons
         ui.horizontal(|ui| {
@@ -180,12 +181,12 @@ impl DbiApp {
                 }
             }
 
-            if ui.button("🗑 Clear All").clicked() {
+            if ui.button("Clear All").clicked() {
                 self.file_list.clear();
                 self.log_messages.push("[x] Cleared file queue".to_string());
             }
             
-            if ui.button("🔄 Refresh").clicked() {
+            if ui.button("Refresh").clicked() {
                 self.reload_file_list();
                 self.log_messages.push("[*] Refreshed file list".to_string());
             }
@@ -195,7 +196,7 @@ impl DbiApp {
 
         // Search bar
         ui.horizontal(|ui| {
-            ui.label("🔍");
+            ui.label("Search:");
             let response = ui.text_edit_singleline(&mut self.search_query);
             if response.changed() {
                 self.reload_file_list();
@@ -212,11 +213,11 @@ impl DbiApp {
         if let Some(db) = &self.database {
             if let Ok((count, total_size, installs)) = db.get_stats() {
                 ui.horizontal(|ui| {
-                    ui.label(format!("📦 {} files", count));
+                    ui.label(format!("Files: {}", count));
                     ui.label("|");
-                    ui.label(format!("💾 {}", format_file_size(total_size)));
+                    ui.label(format!("Size: {}", format_file_size(total_size)));
                     ui.label("|");
-                    ui.label(format!("📥 {} installs", installs));
+                    ui.label(format!("Installs: {}", installs));
                 });
             }
         }
@@ -249,7 +250,7 @@ impl DbiApp {
             .column(Column::auto().at_least(100.0)) // Actions
             .header(20.0, |mut header| {
                 header.col(|ui| {
-                    ui.strong("⭐");
+                    ui.strong("Fav");
                 });
                 header.col(|ui| {
                     ui.strong("Filename");
@@ -269,7 +270,7 @@ impl DbiApp {
                     body.row(18.0, |mut row| {
                         // Favorite column
                         row.col(|ui| {
-                            let star = if file.favorite { "⭐" } else { "☆" };
+                            let star = if file.favorite { "*" } else { " " };
                             if ui.button(star).clicked() {
                                 if let Some(db) = &self.database {
                                     let _ = db.toggle_favorite(file.id);
@@ -278,9 +279,10 @@ impl DbiApp {
                             }
                         });
                         
-                        // Filename column
+                        // Filename column with truncation
                         row.col(|ui| {
-                            ui.label(&file.filename);
+                            ui.label(&file.filename)
+                                .on_hover_text(&file.filename); // Show full name on hover
                         });
                         
                         // Size column
@@ -455,7 +457,7 @@ impl DbiApp {
 pub fn launch_gui() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([900.0, 700.0])
+            .with_inner_size([1280.0, 720.0]) // 16:9 aspect ratio
             .with_title("DBI Backend - Rust Edition"),
         ..Default::default()
     };
