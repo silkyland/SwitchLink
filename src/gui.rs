@@ -430,19 +430,21 @@ impl DbiApp {
             }
         }
         
-        // Terminal-style log box
+        // Terminal-style log box - use available height
+        let available_height = ui.available_height() - 30.0; // Reserve space for status bar
+        
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(20, 20, 20))
             .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 60)))
             .inner_margin(8.0)
             .show(ui, |ui| {
                 ScrollArea::vertical()
-                    .max_height(120.0)
+                    .max_height(available_height)
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
                         ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
                         
-                        for msg in self.log_messages.iter().rev().take(30) {
+                        for msg in self.log_messages.iter().rev().take(50) {
                             ui.colored_label(egui::Color32::from_rgb(200, 200, 200), msg);
                         }
                     });
