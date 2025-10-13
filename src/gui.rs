@@ -165,7 +165,7 @@ impl eframe::App for DbiApp {
                 ui.colored_label(status_color, &self.connection_status);
                 
                 ui.separator();
-                ui.label("Built with Rust");
+                ui.label("Built with Rust 🦀");
                 
                 // Buy me a coffee button
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
