@@ -35,6 +35,10 @@ A high-performance Nintendo Switch DBI backend written in Rust with a modern eGU
    sudo apt-get install libusb-1.0-0-dev
    ```
 
+   **Windows:**
+   - Download and install libusb from https://libusb.info/
+   - Or install with vcpkg: `vcpkg install libusb`
+
 ### Installation
 
 ```bash
@@ -78,6 +82,41 @@ cargo build --release
 ```bash
 cargo run --release -- --cli
 ```
+
+## 🔧 Troubleshooting
+
+### Nintendo Switch Not Detected
+
+If you see an error like "Nintendo Switch not found", check these steps:
+
+1. **Ensure DBI is Running**
+   - Launch DBI on your Nintendo Switch
+   - Select either "Run MTP responder" or "Install title from DBIbackend"
+
+2. **Check USB Connection**
+   - Use a proper data USB cable (not just a charging cable)
+   - Try different USB ports on your computer
+   - Try a different USB cable
+
+3. **Windows-Specific Issues**
+   - Install libusb drivers for the Nintendo Switch
+   - Windows may require driver installation for USB devices
+   - Try running the application as Administrator
+   - Check Device Manager for any USB device conflicts
+
+4. **Linux-Specific Issues**
+   - Add your user to the 'plugdev' group: `sudo usermod -a -G plugdev $USER`
+   - Create a udev rule for the Switch:
+     ```
+     echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="057e", ATTR{idProduct}=="3000", MODE="0666"' | sudo tee /etc/udev/rules.d/51-dbibackend.rules
+     sudo udevadm control --reload-rules && sudo udevadm trigger
+     ```
+
+### Common Error Messages
+
+- **"Nintendo Switch is in normal mode"**: Launch DBI on your Switch and select the correct mode
+- **"Nintendo Switch not found"**: Check USB connection and ensure DBI is running
+- **"IN endpoint not found"**: USB communication issue, try reconnecting the device
 
 ## 🆚 Why eGUI Instead of Dioxus?
 

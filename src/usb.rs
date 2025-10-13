@@ -49,10 +49,13 @@ impl TransferProgress {
 
 // Nintendo Switch USB IDs
 const SWITCH_VENDOR_ID: u16 = 0x057E;
-const SWITCH_PRODUCT_ID: u16 = 0x3000;
+const SWITCH_PRODUCT_ID: u16 = 0x3000;  // DBI/USB transfer mode
+const SWITCH_PRODUCT_ID_NORMAL: u16 = 0x2000;  // Normal mode
+const SWITCH_PRODUCT_ID_MTP: u16 = 0x201D;  // MTP mode (also works with DBI)
 
 const TIMEOUT: Duration = Duration::from_millis(100);
 const TIMEOUT_LONG: Duration = Duration::from_secs(30); // For waiting ACK from Switch
+const RECONNECT_DELAY: Duration = Duration::from_secs(1); // Delay between reconnect attempts
 
 pub struct UsbConnection {
     handle: DeviceHandle<Context>,
@@ -123,15 +126,99 @@ impl UsbConnection {
     }
     
     fn find_switch(context: &Context) -> Result<Device<Context>> {
-        for device in context.devices()?.iter() {
-            let device_desc = device.device_descriptor()?;
-            if device_desc.vendor_id() == SWITCH_VENDOR_ID
-                && device_desc.product_id() == SWITCH_PRODUCT_ID
-            {
-                return Ok(device);
+        info!("Enumerating all USB devices...");
+        let devices = context.devices()?;
+        info!("Found {} USB devices", devices.len());
+
+        let mut found_switch_normal_mode = false;
+        let mut other_nintendo_devices = Vec::new();
+        let mut all_devices = Vec::new();
+
+        for device in devices.iter() {
+            match device.device_descriptor() {
+                Ok(device_desc) => {
+                    let vendor_id = device_desc.vendor_id();
+                    let product_id = device_desc.product_id();
+
+                    // Log all devices for debugging
+                    debug!("USB Device: VID=0x{:04X}, PID=0x{:04X}", vendor_id, product_id);
+                    all_devices.push((vendor_id, product_id));
+
+                    if vendor_id == SWITCH_VENDOR_ID {
+                        if product_id == SWITCH_PRODUCT_ID || product_id == SWITCH_PRODUCT_ID_MTP {
+                            info!("Found Nintendo Switch in DBI/MTP mode! VID=0x{:04X}, PID=0x{:04X}", vendor_id, product_id);
+                            return Ok(device);
+                        } else if product_id == SWITCH_PRODUCT_ID_NORMAL {
+                            warn!("Found Nintendo Switch in NORMAL mode (PID=0x{:04X})", product_id);
+                            warn!("Please launch DBI on your Switch and navigate to 'Run MTP responder' or 'Install title from DBIbackend'");
+                            found_switch_normal_mode = true;
+                        } else {
+                            info!("Found Nintendo Switch with unknown PID=0x{:04X}, trying to connect anyway...", product_id);
+                            other_nintendo_devices.push(product_id);
+                            return Ok(device);
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to get device descriptor: {}", e);
+                }
             }
         }
-        Err(anyhow!("Nintendo Switch not found"))
+
+        // More detailed error reporting
+        if found_switch_normal_mode {
+            error!("Nintendo Switch found but NOT in DBI mode!");
+            error!("Required: VID=0x{:04X}, PID=0x{:04X} (DBI mode)", SWITCH_VENDOR_ID, SWITCH_PRODUCT_ID);
+            error!("Found: VID=0x{:04X}, PID=0x{:04X} (Normal mode)", SWITCH_VENDOR_ID, SWITCH_PRODUCT_ID_NORMAL);
+            error!("Solution: Launch DBI on your Switch and select 'Run MTP responder' or 'Install title from DBIbackend'");
+            Err(anyhow!("Nintendo Switch is in normal mode. Please launch DBI and select 'Run MTP responder' or 'Install title from DBIbackend'"))
+        } else if !other_nintendo_devices.is_empty() {
+            error!("Nintendo Switch found with unexpected product ID!");
+            for pid in other_nintendo_devices {
+                error!("Found: VID=0x{:04X}, PID=0x{:04X}", SWITCH_VENDOR_ID, pid);
+            }
+            error!("Expected: VID=0x{:04X}, PID=0x{:04X} (DBI mode)", SWITCH_VENDOR_ID, SWITCH_PRODUCT_ID);
+            Err(anyhow!("Nintendo Switch found but with unexpected mode. Please make sure DBI is running in the correct mode."))
+        } else {
+            error!("Nintendo Switch not found. Looking for VID=0x{:04X}, PID=0x{:04X}", 
+                   SWITCH_VENDOR_ID, SWITCH_PRODUCT_ID);
+            
+            // Log all detected devices for troubleshooting
+            error!("Detected USB devices:");
+            for (vid, pid) in all_devices {
+                error!("  VID=0x{:04X}, PID=0x{:04X}", vid, pid);
+            }
+            
+            error!("Troubleshooting steps:");
+            error!("1. Make sure your Nintendo Switch is connected via USB");
+            error!("2. Launch DBI on your Switch");
+            error!("3. Select 'Run MTP responder' or 'Install title from DBIbackend'");
+            error!("4. On Windows, you might need to install libusb drivers for the Switch");
+            error!("5. Try a different USB cable (data cable required, not just charging cable)");
+            Err(anyhow!("Nintendo Switch not found. Make sure it's connected via USB and DBI is running.\n\nFor Windows users:\n- Ensure you have libusb drivers installed\n- Try a different USB port\n- Use a data cable, not just a charging cable"))
+        }
+    }
+    
+    // Like the Python version, we'll add a method that continuously tries to connect
+    pub fn connect_with_retry(max_attempts: u32) -> Result<Self> {
+        let mut attempts = 0;
+        
+        loop {
+            attempts += 1;
+            info!("Connection attempt {}/{}", attempts, max_attempts);
+            
+            match Self::connect() {
+                Ok(connection) => return Ok(connection),
+                Err(e) => {
+                    if attempts >= max_attempts {
+                        return Err(e);
+                    }
+                    
+                    warn!("Connection failed: {}. Retrying in {:?}...", e, RECONNECT_DELAY);
+                    std::thread::sleep(RECONNECT_DELAY);
+                }
+            }
+        }
     }
     
     pub fn read(&self, size: usize) -> Result<Vec<u8>> {
@@ -198,7 +285,8 @@ impl DbiServer {
     }
     
     pub fn connect(&mut self) -> Result<()> {
-        self.connection = Some(UsbConnection::connect()?);
+        // Use the retry version like Python does
+        self.connection = Some(UsbConnection::connect_with_retry(10)?);
         Ok(())
     }
     
@@ -225,7 +313,7 @@ impl DbiServer {
     
     fn poll_commands(&mut self) -> Result<()> {
         let mut reconnect_attempts = 0;
-        const MAX_RECONNECT_ATTEMPTS: u32 = 3;
+        const MAX_RECONNECT_ATTEMPTS: u32 = 10; // Increase from 3 to 10 like Python
         
         while *self.running.lock().unwrap() {
             // Check connection and try to reconnect if needed
@@ -244,7 +332,7 @@ impl DbiServer {
                         if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS {
                             return Err(anyhow!("Failed to reconnect after {} attempts", MAX_RECONNECT_ATTEMPTS));
                         }
-                        std::thread::sleep(Duration::from_secs(2));
+                        std::thread::sleep(RECONNECT_DELAY); // Use the same delay as Python
                         continue;
                     }
                 }
@@ -294,7 +382,7 @@ impl DbiServer {
                             rusb::Error::NoDevice => {
                                 warn!("Switch disconnected, will try to reconnect...");
                                 self.connection = None;
-                                std::thread::sleep(Duration::from_secs(1));
+                                std::thread::sleep(RECONNECT_DELAY); // Use the same delay as Python
                                 continue;
                             }
                             _ => {

@@ -1,4 +1,4 @@
-/// eGUI version - Works perfectly in Linux!
+/// eGUI version - Works on both Linux and Windows!
 use eframe::egui;
 use eframe::egui::{CentralPanel, Context, ProgressBar, ScrollArea, Ui};
 use std::collections::HashMap;
@@ -193,6 +193,16 @@ impl eframe::App for DbiApp {
                     ui.label("3. Launch DBI on your Switch");
                     ui.label("4. Select 'Install title from DBIbackend'");
                     ui.label("5. Click 'Start Server' above");
+                    
+                    // Platform-specific instructions
+                    if cfg!(target_os = "windows") {
+                        ui.separator();
+                        ui.heading("🔧 Windows Tips");
+                        ui.label("• Use a data USB cable (not charging only)");
+                        ui.label("• Install libusb drivers if needed");
+                        ui.label("• Try running as Administrator");
+                        ui.label("• Check Device Manager for USB issues");
+                    }
                     
                     ui.separator();
                     

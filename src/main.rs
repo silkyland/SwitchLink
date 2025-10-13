@@ -1,9 +1,9 @@
-mod gui;
 mod cli;
-mod file_manager;
-mod usb;
-mod protocol;
 mod database;
+mod file_manager;
+mod gui;
+mod protocol;
+mod usb;
 
 fn main() {
     // Initialize logging with DEBUG level to see detailed protocol communication
@@ -20,7 +20,12 @@ fn main() {
     } else {
         // Launch the eGUI
         println!("🎮 Launching DBI Backend with eGUI...");
-        println!("✅ eGUI works perfectly in Linux!");
+        println!("✅ Works on both Linux and Windows!");
+        println!("💡 If you're on Windows and having connection issues:");
+        println!("   1. Make sure you've installed libusb drivers");
+        println!("   2. Use a data USB cable (not just a charging cable)");
+        println!("   3. Try running as Administrator");
+        println!("   4. Check that DBI is running on your Switch in the correct mode");
         gui::launch_gui();
     }
 }

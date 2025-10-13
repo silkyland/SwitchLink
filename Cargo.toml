@@ -43,6 +43,14 @@ bytes = "1.5"
 dirs = "5.0"
 open = "5.0"
 
+[[bin]]
+name = "dbi-backend-rust"
+path = "src/main.rs"
+
+[[bin]]
+name = "test-usb"
+path = "test_usb.rs"
+
 [profile.release]
 opt-level = 3
 lto = true
