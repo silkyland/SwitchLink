@@ -79,18 +79,7 @@ cargo build --release
 
 ```bash
 cargo run --release -- --cli
-```
-
-## 🆚 Why eGUI Instead of Dioxus?
-
-### ✅ **eGUI Advantages:**
-- **Native Linux Support**: No webkit dependencies or GBM buffer issues
-- **Immediate Mode GUI**: Faster rendering and more responsive
-- **Better Performance**: Optimized for desktop applications
-
-### ❌ **Dioxus Issues in Linux:**
-- **Webkit Dependencies**: Requires webkitgtk which has buffer issues
-- **GBM Buffer Errors**: "Failed to create GBM buffer" on some systems
+``
 
 ## 🏗️ Architecture
 
