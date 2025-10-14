@@ -2,6 +2,8 @@
 
 A high-performance Nintendo Switch DBI backend written in Rust with a modern eGUI interface that works perfectly in Linux.
 
+<img width="1391" height="849" alt="image" src="https://github.com/user-attachments/assets/dda61fab-7fd6-4f4b-aa9c-921a56e8e2f0" />
+
 ## ✨ Features
 
 ### 🚀 Performance Improvements
