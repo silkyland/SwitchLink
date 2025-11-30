@@ -69,7 +69,8 @@ public:
     
     // Download a file
     // If fileSize is provided (> 0), it helps handling the last chunk correctly
-    bool downloadFile(const std::string& filename, const std::string& destPath, std::function<void(uint64_t, uint64_t)> progressCallback = nullptr, uint64_t fileSize = 0);
+    // progressCallback returns true to continue, false to cancel
+    bool downloadFile(const std::string& filename, const std::string& destPath, std::function<bool(uint64_t, uint64_t)> progressCallback = nullptr, uint64_t fileSize = 0);
     
     static constexpr size_t CHUNK_SIZE = 1024 * 1024; // 1MB chunks for maximum performance
     static constexpr uint32_t USB_TIMEOUT = 5000; // 5 seconds

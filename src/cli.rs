@@ -1,10 +1,10 @@
-/// CLI version for DBI Backend - No GUI dependencies
+/// CLI version for SwitchLink - No GUI dependencies
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::io::{self, Write};
 
 pub fn run_cli() {
-    println!(" DBI Backend - Rust Edition (CLI Mode)");
+    println!(" SwitchLink - Rust Edition (CLI Mode)");
     println!("========================================");
     println!();
 
@@ -82,13 +82,13 @@ pub fn run_cli() {
                 println!(" Cleared {} files", count);
             }
             "5" => {
-                println!("\n Starting DBI Server Demo...");
+                println!("\n Starting SwitchLink Server Demo...");
                 println!(" Files in queue: {}", file_list.len());
                 println!();
                 println!(" Instructions:");
                 println!("  1. Connect Nintendo Switch via USB");
-                println!("  2. Launch DBI on your Switch");
-                println!("  3. Select 'Install title from DBIbackend'");
+                println!("  2. Launch SwitchLink Client on your Switch");
+                println!("  3. Select 'Install title from SwitchLink'");
                 println!();
                 println!(" Server demo mode - Press Enter to stop...");
                 let mut input = String::new();

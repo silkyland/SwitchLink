@@ -1,4 +1,4 @@
-/// eGUI version - Modern, Beautiful UI for DBI Backend
+/// eGUI version - Modern, Beautiful UI for SwitchLink
 use eframe::egui;
 use eframe::egui::{CentralPanel, Context, ProgressBar, ScrollArea, Ui, Color32, Stroke, Rounding, Vec2};
 use std::collections::HashMap;
@@ -93,7 +93,7 @@ impl DbiApp {
         // Initialize database
         let db_path = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("dbi-backend")
+            .join("switchlink")
             .join("games.db");
         
         // Create directory if needed
@@ -104,7 +104,7 @@ impl DbiApp {
         let database = Database::new(&db_path).ok();
         
         Self {
-            log_messages: vec!["🚀 DBI Backend started - Ready to transfer!".to_string()],
+            log_messages: vec!["🚀 SwitchLink started - Ready to transfer!".to_string()],
             connection_status: "Disconnected".to_string(),
             progress: Arc::new(Mutex::new(TransferProgress::default())),
             database,
@@ -147,8 +147,8 @@ impl DbiApp {
         self.server_thread = Some(handle);
         self.server_running = true;
         self.connection_status = "Connected".to_string();
-        self.log_messages.push("[>] Starting DBI server...".to_string());
-        self.log_messages.push("[i] Connect your Switch and select 'Install title from DBIbackend'".to_string());
+        self.log_messages.push("[>] Starting SwitchLink server...".to_string());
+        self.log_messages.push("[i] Connect your Switch and select 'Install title from SwitchLink'".to_string());
     }
 
     fn stop_server(&mut self) {
@@ -221,7 +221,7 @@ impl eframe::App for DbiApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     // App title with gradient effect
-                    ui.heading(egui::RichText::new("🎮 DBI Backend")
+                    ui.heading(egui::RichText::new("🎮 SwitchLink")
                         .size(24.0)
                         .color(self.theme.text_primary));
                     
@@ -416,8 +416,8 @@ impl DbiApp {
                 let steps = [
                     ("1", "Add NSP/NSZ/XCI/XCZ files or folders", "📁"),
                     ("2", "Connect your Nintendo Switch via USB", "🔌"),
-                    ("3", "Launch DBI on your Switch", "🎮"),
-                    ("4", "Select 'Install title from DBIbackend'", "📲"),
+                    ("3", "Launch SwitchLink Client on your Switch", "🎮"),
+                    ("4", "Select 'Install title from SwitchLink'", "📲"),
                     ("5", "Click 'Start Server' button above", "▶"),
                 ];
                 
@@ -941,12 +941,12 @@ pub fn launch_gui() {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 900.0]) // Larger window for better UX
             .with_min_inner_size([1024.0, 768.0]) // Minimum size
-            .with_title("DBI Backend - Modern Edition"),
+            .with_title("SwitchLink - Modern Edition"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "DBI Backend - Modern Edition",
+        "SwitchLink - Modern Edition",
         options,
         Box::new(|_cc| Box::new(DbiApp::new())),
     ).unwrap();

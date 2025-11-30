@@ -242,7 +242,7 @@ std::vector<FileInfo> USBClient::listFiles() {
     return files;
 }
 
-bool USBClient::downloadFile(const std::string& filename, const std::string& destPath, std::function<void(uint64_t, uint64_t)> progressCallback, uint64_t fileSize) {
+bool USBClient::downloadFile(const std::string& filename, const std::string& destPath, std::function<bool(uint64_t, uint64_t)> progressCallback, uint64_t fileSize) {
     if (!m_connected) return false;
     
     FILE* fp = fopen(destPath.c_str(), "wb");
@@ -256,15 +256,19 @@ bool USBClient::downloadFile(const std::string& filename, const std::string& des
     
     uint64_t offset = 0;
     bool success = true;
+    bool cancelled = false;
     
     while (true) {
+        // Check if we've received all data
+        if (fileSize > 0 && offset >= fileSize) {
+            // Transfer complete
+            break;
+        }
+        
         // Calculate chunk size
         uint32_t requestSize = CHUNK_SIZE;
-        if (fileSize > 0) {
-            if (offset >= fileSize) break; // Done
-            if (offset + requestSize > fileSize) {
-                requestSize = (uint32_t)(fileSize - offset);
-            }
+        if (fileSize > 0 && offset + requestSize > fileSize) {
+            requestSize = (uint32_t)(fileSize - offset);
         }
         
         // 1. Send FILE_RANGE command header
@@ -336,20 +340,22 @@ bool USBClient::downloadFile(const std::string& filename, const std::string& des
             break;
         }
         
-        // 5. Send ACK for the response
+        // 6. Receive File Data
+        // Server now sends actual size in response.length (may be less than requested)
+        uint32_t expectedSize = response.length;
+        
+        // 5. Send ACK for the response (must send even if expectedSize is 0)
         if (!sendCommand(CMD_TYPE_ACK, (uint32_t)Command::GET_FILE, 0)) {
             printf("Failed to send ACK for response\n");
             success = false;
             break;
         }
         
-        // 6. Receive File Data
-        uint32_t expectedSize = requestSize;
-        if (response.length != expectedSize) {
-            expectedSize = response.length;
+        // Check if transfer is complete (server sent 0 bytes)
+        if (expectedSize == 0) {
+            // Transfer complete - no more data from server
+            break;
         }
-        
-        if (expectedSize == 0) break;
         
         if (!receiveData(chunkBuffer, expectedSize)) {
             printf("Failed to receive chunk data\n");
@@ -367,8 +373,12 @@ bool USBClient::downloadFile(const std::string& filename, const std::string& des
         
         offset += written;
         
+        // Call progress callback - returns false if user wants to cancel
         if (progressCallback) {
-            progressCallback(offset, fileSize);
+            if (!progressCallback(offset, fileSize)) {
+                cancelled = true;
+                break;
+            }
             consoleUpdate(NULL);
         }
         
@@ -379,9 +389,10 @@ bool USBClient::downloadFile(const std::string& filename, const std::string& des
     
     fclose(fp);
     
-    if (!success) {
+    // Delete incomplete file on failure or cancel
+    if (!success || cancelled) {
         remove(destPath.c_str());
     }
     
-    return success;
+    return success && !cancelled;
 }

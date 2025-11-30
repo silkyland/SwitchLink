@@ -19,7 +19,7 @@ fn main() {
         cli::run_cli();
     } else {
         // Launch the eGUI
-        println!("🎮 Launching DBI Backend with eGUI...");
+        println!("🎮 Launching SwitchLink with eGUI...");
         println!("✅ eGUI works perfectly in Linux!");
         gui::launch_gui();
     }

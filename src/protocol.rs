@@ -1,4 +1,4 @@
-/// DBI Protocol constants and structures
+/// SwitchLink Protocol constants and structures
 use std::io::{self, Read};
 use bytes::{Buf, BufMut, BytesMut};
 
