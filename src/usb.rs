@@ -332,8 +332,18 @@ impl DbiServer {
         let file_list = self.file_list.lock().unwrap();
         
         let mut nsp_path_list = String::new();
-        for (name, _) in file_list.iter() {
+        for (name, path) in file_list.iter() {
+            // Get file size
+            let size = if let Ok(metadata) = std::fs::metadata(path) {
+                metadata.len()
+            } else {
+                0
+            };
+            
+            // Format: filename|size\n
             nsp_path_list.push_str(name);
+            nsp_path_list.push('|');
+            nsp_path_list.push_str(&size.to_string());
             nsp_path_list.push('\n');
         }
         
