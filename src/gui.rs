@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use crate::database::Database;
 use crate::file_manager::{add_files, add_files_from_directory, format_file_size};
-use crate::usb::{DbiServer, TransferProgress};
+use crate::usb::{SwitchLinkServer, TransferProgress};
 
 // Modern Color Palette
 pub struct ColorTheme {
@@ -80,7 +80,7 @@ pub struct DbiApp {
     server_running: bool,
     connection_status: String,
     server_thread: Option<thread::JoinHandle<()>>,
-    server_instance: Option<Arc<Mutex<DbiServer>>>,
+    server_instance: Option<Arc<Mutex<SwitchLinkServer>>>,
     progress: Arc<Mutex<TransferProgress>>,
     database: Option<Database>,
     search_query: String,
@@ -130,7 +130,7 @@ impl DbiApp {
         let file_list = Arc::new(Mutex::new(self.file_list.clone()));
         
         // Create server instance with progress tracking
-        let server = DbiServer::new_with_progress(file_list, self.progress.clone());
+        let server = SwitchLinkServer::new_with_progress(file_list, self.progress.clone());
         let server_arc = Arc::new(Mutex::new(server));
         self.server_instance = Some(server_arc.clone());
 
