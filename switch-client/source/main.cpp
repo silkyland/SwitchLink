@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 #include "usb_client.h"
-#include "nsp_installer.h"
+#include "stream_installer.h"
 
 // Console dimensions (Switch default: 80x45)
 #define CONSOLE_WIDTH 80
@@ -258,13 +258,18 @@ bool drawProgressBar(int row, uint64_t current, uint64_t total) {
     printf("  " FG_WHITE "Progress: " FG_BRIGHT_CYAN "%s" FG_WHITE " / " FG_BRIGHT_CYAN "%s",
            formatSize(current).c_str(), formatSize(total).c_str());
     
-    // Calculate speed
+    // Calculate speed using proper tick conversion
     uint64_t currentTime = armGetSystemTick();
     if (g_lastTime > 0) {
-        uint64_t timeDiff = (currentTime - g_lastTime) / 19200000; // Convert to ms
-        if (timeDiff > 300) { // Update every 300ms
+        // Convert ticks to nanoseconds, then to milliseconds
+        uint64_t tickDiff = currentTime - g_lastTime;
+        uint64_t nsDiff = armTicksToNs(tickDiff);
+        uint64_t timeDiffMs = nsDiff / 1000000; // ns to ms
+        
+        if (timeDiffMs > 300) { // Update every 300ms
             uint64_t bytesDiff = current - g_lastBytes;
-            g_lastSpeed = (float)bytesDiff / (float)timeDiff * 1000.0f / 1024.0f / 1024.0f;
+            // Calculate MB/s: bytes / ms * 1000 / 1024 / 1024
+            g_lastSpeed = (float)bytesDiff / (float)timeDiffMs * 1000.0f / 1024.0f / 1024.0f;
             g_lastBytes = current;
             g_lastTime = currentTime;
         }
@@ -531,18 +536,17 @@ int main(int argc, char* argv[]) {
             FileEntry& entry = entries[selectedIdx];
             uint64_t fileSize = entry.info.size;
             
-            // Show download screen
+            // Show install screen
             drawDownloadScreen(entry.info.filename, fileSize);
             resetProgressState();
             
-            // Create download directory
-            mkdir("/switch/downloads", 0777);
-            std::string destPath = "/switch/downloads/" + entry.info.filename;
+            // Create streaming installer
+            StreamInstaller installer(client, NcmStorageId_SdCard);
             
-            // Download with progress (callback returns true to continue, false to cancel)
-            bool success = client.downloadFile(entry.info.filename, destPath, 
+            // Install with progress (callback returns true to continue, false to cancel)
+            bool success = installer.install(entry.info.filename, fileSize,
                 [fileSize](uint64_t current, uint64_t total) -> bool {
-                    return drawProgressBar(14, current, fileSize > 0 ? fileSize : total);
+                    return drawProgressBar(14, current, total > 0 ? total : fileSize);
                 });
             
             // Clear the cancel hint and dialog area
@@ -558,15 +562,15 @@ int main(int argc, char* argv[]) {
                 // Show success message
                 moveCursor(18, 1);
                 printf(BG_BLUE FG_BRIGHT_GREEN BOLD);
-                printf("  Download Complete!");
+                printf("  Installation Complete!");
                 consoleUpdate(NULL);
                 
-                svcSleepThread(1000000000ULL); // 1 second
+                svcSleepThread(2000000000ULL); // 2 seconds
             } else if (g_cancelRequested) {
                 // Show cancelled message
                 moveCursor(18, 1);
                 printf(BG_BLUE FG_BRIGHT_YELLOW BOLD);
-                printf("  Download Cancelled");
+                printf("  Installation Cancelled");
                 consoleUpdate(NULL);
                 
                 svcSleepThread(1000000000ULL); // 1 second
@@ -574,8 +578,11 @@ int main(int argc, char* argv[]) {
                 // Show error message
                 moveCursor(18, 1);
                 printf(BG_BLUE FG_RED BOLD);
-                printf("  Download Failed!");
+                printf("  Installation Failed!");
                 moveCursor(20, 1);
+                printf(BG_BLUE FG_WHITE);
+                printf("  Error: %s", installer.getLastError().c_str());
+                moveCursor(22, 1);
                 printf(BG_BLUE FG_WHITE);
                 printf("  Press any button to continue...");
                 consoleUpdate(NULL);
