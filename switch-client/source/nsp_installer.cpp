@@ -25,20 +25,18 @@ bool NSPInstaller::initialize() {
     // Initialize NCM (Nintendo Content Manager)
     rc = ncmInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize NCM: 0x%x\n", rc);
         return false;
     }
     
     // Initialize NS (Nintendo Shell)
     rc = nsInitialize();
     if (R_FAILED(rc)) {
-        printf("Failed to initialize NS: 0x%x\n", rc);
         ncmExit();
         return false;
     }
     
     m_initialized = true;
-    printf("NSP Installer initialized!\n");
+
     return true;
 }
 
@@ -52,12 +50,10 @@ void NSPInstaller::close() {
 
 bool NSPInstaller::installNSP(const std::string& destPath, bool installToNand) {
     if (!m_initialized) {
-        printf("Installer not initialized!\n");
         return false;
     }
     
-    printf("Installing NSP: %s\n", destPath.c_str());
-    printf("Target: %s\n", installToNand ? "NAND" : "SD Card");
+
     
     Result rc;
     
@@ -67,14 +63,12 @@ bool NSPInstaller::installNSP(const std::string& destPath, bool installToNand) {
     // Open content storage
     rc = ncmOpenContentStorage(&m_contentStorage, storageId);
     if (R_FAILED(rc)) {
-        printf("Failed to open content storage: 0x%x\n", rc);
         return false;
     }
     
     // Open content meta database
     rc = ncmOpenContentMetaDatabase(&m_metaDb, storageId);
     if (R_FAILED(rc)) {
-        printf("Failed to open meta database: 0x%x\n", rc);
         ncmContentStorageClose(&m_contentStorage);
         return false;
     }
@@ -94,9 +88,7 @@ bool NSPInstaller::installNSP(const std::string& destPath, bool installToNand) {
     // 5. Committing installation
     
     // For now, we'll use a simplified approach that works with existing tools
-    printf("✓ NSP prepared for installation\n");
-    printf("Note: Use DBI/Tinfoil for actual installation\n");
-    printf("File ready at: %s\n", destPath.c_str());
+
     
     // Cleanup
     ncmContentMetaDatabaseClose(&m_metaDb);
@@ -111,7 +103,6 @@ bool NSPInstaller::openNSP(const std::string& path) {
     memset(&attr, 0, sizeof(attr));
     Result rc = fsOpenFileSystemWithId(&m_fileSystem, 0, FsFileSystemType_ApplicationPackage, path.c_str(), attr);
     if (R_FAILED(rc)) {
-        printf("Failed to open NSP: 0x%x\n", rc);
         return false;
     }
     return true;
