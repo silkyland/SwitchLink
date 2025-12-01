@@ -185,91 +185,49 @@ std::string StreamInstaller::contentIdToString(const NcmContentId& id) {
 }
 
 bool StreamInstaller::installTicketCert() {
-    printf("Checking for tickets and certificates...\n");
-    
     // Find .tik and .cert files
     auto tikFiles = m_pfs0->getFilesByExtension(".tik");
     auto certFiles = m_pfs0->getFilesByExtension(".cert");
     
     if (tikFiles.empty()) {
-        printf("No tickets found (free game or already installed)\n");
         return true; // Not an error - free games don't have tickets
     }
     
     if (tikFiles.size() != certFiles.size()) {
         m_lastError = "Ticket/Certificate count mismatch";
-        printf("ERROR: %s\n", m_lastError.c_str());
         return false;
     }
-    
-    printf("Found %zu ticket(s) in NSP\n", tikFiles.size());
     
     // Try to initialize ES service for ticket import
     Result rc = esInitialize();
     if (R_FAILED(rc)) {
-        printf("\n");
-        printf("WARNING: Failed to initialize ES service (0x%X)\n", rc);
-        printf("Tickets will NOT be installed.\n");
-        printf("\n");
-        printf("This is normal if you have sigpatches installed (Atmosphere + Hekate).\n");
-        printf("Most users have sigpatches, so games will work fine.\n");
-        printf("\n");
-        printf("If you don't have sigpatches:\n");
-        printf("  - Free games will work\n");
-        printf("  - Purchased games may not launch\n");
-        printf("  - Install sigpatches from: https://sigmapatches.coomer.party/\n");
-        printf("\n");
-        return true; // Not fatal - most users have sigpatches
+        // ES service not available - skip ticket installation
+        // Most users have sigpatches, so this is not fatal
+        return true;
     }
     
     // ES service available - try to install tickets
-    printf("ES service initialized - attempting ticket installation...\n");
-    bool allSuccess = true;
-    
     for (size_t i = 0; i < tikFiles.size(); i++) {
         const auto* tikFile = tikFiles[i];
         const auto* certFile = certFiles[i];
         
-        printf("  [%zu/%zu] Installing: %s\n", i + 1, tikFiles.size(), tikFile->name.c_str());
-        
         // Read ticket data
         std::vector<uint8_t> tikData(tikFile->size);
         if (!m_pfs0->readFileData(*tikFile, 0, tikFile->size, tikData.data())) {
-            printf("    ERROR: Failed to read ticket file\n");
-            allSuccess = false;
             continue;
         }
         
         // Read certificate data
         std::vector<uint8_t> certData(certFile->size);
         if (!m_pfs0->readFileData(*certFile, 0, certFile->size, certData.data())) {
-            printf("    ERROR: Failed to read certificate file\n");
-            allSuccess = false;
             continue;
         }
         
         // Import ticket using ES service
-        rc = esImportTicket(tikData.data(), tikData.size(), certData.data(), certData.size());
-        if (R_FAILED(rc)) {
-            printf("    WARNING: Failed to import ticket (0x%X)\n", rc);
-            printf("    This may not be an issue if you have sigpatches installed\n");
-            allSuccess = false;
-        } else {
-            printf("    ✓ Ticket imported successfully\n");
-        }
+        esImportTicket(tikData.data(), tikData.size(), certData.data(), certData.size());
     }
     
     esExit();
-    
-    printf("\n");
-    if (allSuccess) {
-        printf("✓ All tickets installed successfully!\n");
-    } else {
-        printf("⚠ Some tickets failed to install\n");
-        printf("Game may still work if you have sigpatches installed\n");
-    }
-    printf("\n");
-    
     return true; // Always return true - ticket failures are not fatal
 }
 
@@ -391,16 +349,16 @@ bool StreamInstaller::readCNMT() {
         char ncaPath[FS_MAX_PATH];
         Result rc = ncmContentStorageGetPath(&m_contentStorage, ncaPath, sizeof(ncaPath), &cnmtNcaId);
         if (R_FAILED(rc)) {
-            printf("Warning: Failed to get CNMT NCA path: 0x%X\n", rc);
+
             continue;
         }
-        printf("CNMT NCA path: %s\n", ncaPath);
+
         
         // Mount the CNMT NCA filesystem
         FsFileSystem cnmtFs;
         rc = fsOpenFileSystemWithId(&cnmtFs, 0, FsFileSystemType_ContentMeta, ncaPath, FsContentAttributes_None);
         if (R_FAILED(rc)) {
-            printf("Warning: Failed to mount CNMT filesystem: 0x%X\n", rc);
+
             // Try alternative method - read CNMT directly from NSP
             if (!readCNMTFromNSP(cnmtFile)) {
                 continue;
@@ -426,7 +384,7 @@ bool StreamInstaller::readCNMT() {
         
         // Register content meta with the system
         if (!registerContentMeta(cnmtContentInfo)) {
-            printf("Warning: Failed to register content meta\n");
+
         }
     }
     
@@ -441,7 +399,7 @@ bool StreamInstaller::readCNMT() {
         
         ContentInfo info;
         if (!parseNcaId(ncaFile->name, info.contentId)) {
-            printf("Warning: Could not parse NCA ID from: %s\n", ncaFile->name.c_str());
+
             continue;
         }
         
@@ -464,8 +422,7 @@ bool StreamInstaller::readCNMT() {
         }
     }
     
-    printf("Total NCAs to install: %zu\n", m_contents.size());
-    printf("Total install size: %lu bytes\n", m_totalInstallSize);
+
     return true;
 }
 
@@ -474,7 +431,7 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
     FsDir dir;
     Result rc = fsFsOpenDirectory(fs, "/", FsDirOpenMode_ReadFiles, &dir);
     if (R_FAILED(rc)) {
-        printf("Failed to open CNMT directory: 0x%X\n", rc);
+
         return false;
     }
     
@@ -492,11 +449,11 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
     fsDirClose(&dir);
     
     if (cnmtName[0] == '\0') {
-        printf("No .cnmt file found in CNMT NCA\n");
+
         return false;
     }
     
-    printf("Found CNMT file: %s\n", cnmtName);
+
     
     // Open and read the CNMT file
     char cnmtPath[FS_MAX_PATH];
@@ -505,7 +462,7 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
     FsFile cnmtFile;
     rc = fsFsOpenFile(fs, cnmtPath, FsOpenMode_Read, &cnmtFile);
     if (R_FAILED(rc)) {
-        printf("Failed to open CNMT file: 0x%X\n", rc);
+
         return false;
     }
     
@@ -513,7 +470,7 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
     rc = fsFileGetSize(&cnmtFile, &fileSize);
     if (R_FAILED(rc)) {
         fsFileClose(&cnmtFile);
-        printf("Failed to get CNMT file size: 0x%X\n", rc);
+
         return false;
     }
     
@@ -523,7 +480,7 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
     fsFileClose(&cnmtFile);
     
     if (R_FAILED(rc) || bytesRead != (u64)fileSize) {
-        printf("Failed to read CNMT file: 0x%X\n", rc);
+
         return false;
     }
     
@@ -534,7 +491,7 @@ bool StreamInstaller::readCNMTFromFS(FsFileSystem* fs) {
 bool StreamInstaller::readCNMTFromNSP(const PFS0FileInfo* cnmtNcaFile) {
     // Fallback: try to read CNMT structure directly
     // This is a simplified approach that may not work for all NSPs
-    printf("Attempting to read CNMT from NSP directly (fallback)\n");
+
     
     // For now, just enumerate all NCAs from NSP
     auto ncaFiles = m_pfs0->getFilesByExtension(".nca");
@@ -566,7 +523,7 @@ bool StreamInstaller::parseCNMTData(const uint8_t* data, size_t size) {
     // Get content infos from CNMT
     const auto& contentInfos = meta.getContentInfos();
     
-    printf("CNMT contains %zu content entries\n", contentInfos.size());
+
     
     // Store parsed meta for later registration
     m_parsedMeta = std::make_unique<ContentMeta>(data, size);
@@ -596,8 +553,7 @@ bool StreamInstaller::parseCNMTData(const uint8_t* data, size_t size) {
         m_contents.push_back(info);
         m_totalInstallSize += info.size;
         
-        printf("  Content: %s type=%d size=%lu\n", 
-               idStr.c_str(), info.type, info.size);
+
     }
     
     return true;
@@ -605,51 +561,40 @@ bool StreamInstaller::parseCNMTData(const uint8_t* data, size_t size) {
 
 bool StreamInstaller::registerContentMeta(const NcmContentInfo& cnmtContentInfo) {
     if (!m_parsedMeta) {
-        printf("No parsed content meta available\n");
+
         return false;
     }
     
     // Create install content meta buffer
     std::vector<uint8_t> installMetaBuffer;
     if (!m_parsedMeta->createInstallContentMeta(installMetaBuffer, cnmtContentInfo, true)) {
-        printf("Failed to create install content meta\n");
+
         return false;
     }
     
     // Get content meta key
     NcmContentMetaKey metaKey = m_parsedMeta->getContentMetaKey();
     
-    printf("Registering content meta: TitleID=%016lX Version=%u Type=%d\n",
-           metaKey.id, metaKey.version, metaKey.type);
+
     
     // Set content meta in database
     Result rc = ncmContentMetaDatabaseSet(&m_contentMetaDb, &metaKey, 
                                           installMetaBuffer.data(), installMetaBuffer.size());
     if (R_FAILED(rc)) {
-        printf("Failed to set content meta: 0x%X\n", rc);
+
         return false;
     }
     
     // Commit the database
     rc = ncmContentMetaDatabaseCommit(&m_contentMetaDb);
     if (R_FAILED(rc)) {
-        printf("Failed to commit content meta database: 0x%X\n", rc);
+
         return false;
     }
     
     // Push application record
     uint64_t baseTitleId = ContentMetaUtil::getBaseTitleId(metaKey.id, 
                                                            static_cast<NcmContentMetaType>(metaKey.type));
-    
-    const char* typeStr = "Unknown";
-    switch (metaKey.type) {
-        case NcmContentMetaType_Application: typeStr = "Base Game"; break;
-        case NcmContentMetaType_Patch: typeStr = "Update"; break;
-        case NcmContentMetaType_AddOnContent: typeStr = "DLC"; break;
-        default: break;
-    }
-    printf("Registering %s: TitleID=%016lX -> BaseTitleID=%016lX\n", 
-           typeStr, metaKey.id, baseTitleId);
     
     // Create content storage record (matches system's ContentStorageRecord)
     struct ContentStorageRecord {
@@ -670,8 +615,6 @@ bool StreamInstaller::registerContentMeta(const NcmContentInfo& cnmtContentInfo)
     Service appManSrv;
     rc = nsGetApplicationManagerInterface(&appManSrv);
     if (R_FAILED(rc)) {
-        printf("Warning: Failed to get ApplicationManagerInterface: 0x%X\n", rc);
-        printf("Game may not appear until reboot\n");
         return true; // Not fatal - game is installed, just may need reboot
     }
     
@@ -692,16 +635,7 @@ bool StreamInstaller::registerContentMeta(const NcmContentInfo& cnmtContentInfo)
         .buffers = { { &storageRecord, sizeof(storageRecord) } },
     );
     
-    if (R_FAILED(rc)) {
-        printf("Warning: Failed to push application record: 0x%X\n", rc);
-        printf("Game may not appear until reboot\n");
-    } else {
-        printf("✓ Application record registered successfully!\n");
-    }
-    
     serviceClose(&appManSrv);
-    
-    printf("Content meta registered successfully!\n");
     return true;
 }
 
