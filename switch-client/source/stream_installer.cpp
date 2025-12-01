@@ -1,5 +1,6 @@
 #include "stream_installer.h"
 #include "content_meta.h"
+#include "es_wrapper.h"
 #include <cstring>
 #include <cstdio>
 #include <algorithm>
@@ -61,7 +62,7 @@ bool StreamInstaller::initializeServices() {
     }
     
     m_servicesInitialized = true;
-    printf("NCM services initialized\n");
+    // NCM services initialized
     return true;
 }
 
@@ -184,34 +185,96 @@ std::string StreamInstaller::contentIdToString(const NcmContentId& id) {
 }
 
 bool StreamInstaller::installTicketCert() {
-    printf("Installing tickets and certificates...\n");
+    printf("Checking for tickets and certificates...\n");
     
-    // Find .tik files
+    // Find .tik and .cert files
     auto tikFiles = m_pfs0->getFilesByExtension(".tik");
     auto certFiles = m_pfs0->getFilesByExtension(".cert");
     
     if (tikFiles.empty()) {
-        printf("No tickets found (might be a free game)\n");
+        printf("No tickets found (free game or already installed)\n");
         return true; // Not an error - free games don't have tickets
     }
     
-    // Note: Ticket installation requires ES service which may not be available
-    // in all homebrew environments. For now, we'll just copy tickets to the
-    // appropriate location and let the system handle them.
-    // Full ticket import would require using es:ImportTicket service.
-    
-    for (const auto* tikFile : tikFiles) {
-        printf("Found ticket: %s (size: %lu)\n", tikFile->name.c_str(), tikFile->size);
-        // TODO: Implement proper ticket installation when ES service is available
-        // For now, games that require tickets may not work properly
+    if (tikFiles.size() != certFiles.size()) {
+        m_lastError = "Ticket/Certificate count mismatch";
+        printf("ERROR: %s\n", m_lastError.c_str());
+        return false;
     }
     
-    printf("Note: Ticket installation skipped - may need sigpatches\n");
-    return true;
+    printf("Found %zu ticket(s) in NSP\n", tikFiles.size());
+    
+    // Try to initialize ES service for ticket import
+    Result rc = esInitialize();
+    if (R_FAILED(rc)) {
+        printf("\n");
+        printf("WARNING: Failed to initialize ES service (0x%X)\n", rc);
+        printf("Tickets will NOT be installed.\n");
+        printf("\n");
+        printf("This is normal if you have sigpatches installed (Atmosphere + Hekate).\n");
+        printf("Most users have sigpatches, so games will work fine.\n");
+        printf("\n");
+        printf("If you don't have sigpatches:\n");
+        printf("  - Free games will work\n");
+        printf("  - Purchased games may not launch\n");
+        printf("  - Install sigpatches from: https://sigmapatches.coomer.party/\n");
+        printf("\n");
+        return true; // Not fatal - most users have sigpatches
+    }
+    
+    // ES service available - try to install tickets
+    printf("ES service initialized - attempting ticket installation...\n");
+    bool allSuccess = true;
+    
+    for (size_t i = 0; i < tikFiles.size(); i++) {
+        const auto* tikFile = tikFiles[i];
+        const auto* certFile = certFiles[i];
+        
+        printf("  [%zu/%zu] Installing: %s\n", i + 1, tikFiles.size(), tikFile->name.c_str());
+        
+        // Read ticket data
+        std::vector<uint8_t> tikData(tikFile->size);
+        if (!m_pfs0->readFileData(*tikFile, 0, tikFile->size, tikData.data())) {
+            printf("    ERROR: Failed to read ticket file\n");
+            allSuccess = false;
+            continue;
+        }
+        
+        // Read certificate data
+        std::vector<uint8_t> certData(certFile->size);
+        if (!m_pfs0->readFileData(*certFile, 0, certFile->size, certData.data())) {
+            printf("    ERROR: Failed to read certificate file\n");
+            allSuccess = false;
+            continue;
+        }
+        
+        // Import ticket using ES service
+        rc = esImportTicket(tikData.data(), tikData.size(), certData.data(), certData.size());
+        if (R_FAILED(rc)) {
+            printf("    WARNING: Failed to import ticket (0x%X)\n", rc);
+            printf("    This may not be an issue if you have sigpatches installed\n");
+            allSuccess = false;
+        } else {
+            printf("    ✓ Ticket imported successfully\n");
+        }
+    }
+    
+    esExit();
+    
+    printf("\n");
+    if (allSuccess) {
+        printf("✓ All tickets installed successfully!\n");
+    } else {
+        printf("⚠ Some tickets failed to install\n");
+        printf("Game may still work if you have sigpatches installed\n");
+    }
+    printf("\n");
+    
+    return true; // Always return true - ticket failures are not fatal
 }
 
 bool StreamInstaller::installNCA(const ContentInfo& content) {
-    printf("Installing NCA: %s (%lu bytes)\n", content.filename.c_str(), content.size);
+    // Installing NCA
     
     const PFS0FileInfo* ncaFile = m_pfs0->getFileByName(content.filename);
     if (!ncaFile) {
@@ -274,28 +337,18 @@ bool StreamInstaller::installNCA(const ContentInfo& content) {
         }
     }
     
-    // Register the content (move from placeholder to registered)
-    printf("Registering content: %s\n", contentIdToString(content.contentId).c_str());
+    // Register the content
     rc = ncmContentStorageRegister(&m_contentStorage, &content.contentId, &placeholderId);
     if (R_FAILED(rc)) {
         if (rc == 0x805) {
-            // Already exists - this is OK, delete placeholder
-            printf("Content already registered (0x805)\n");
+            // Already exists - delete placeholder
             ncmContentStorageDeletePlaceHolder(&m_contentStorage, &placeholderId);
         } else {
-            printf("ERROR: Failed to register content (0x%X)\n", rc);
             m_lastError = "Failed to register content: 0x" + std::to_string(rc);
             ncmContentStorageDeletePlaceHolder(&m_contentStorage, &placeholderId);
             return false;
         }
-    } else {
-        printf("Content registered successfully!\n");
-        // Don't delete placeholder - register should have moved it
-        // Only delete if it still exists (shouldn't happen)
-        // ncmContentStorageDeletePlaceHolder(&m_contentStorage, &placeholderId);
     }
-    
-    printf("NCA installed successfully\n");
     return true;
 }
 
@@ -313,12 +366,12 @@ bool StreamInstaller::readCNMT() {
     
     // Process each CNMT NCA
     for (const auto* cnmtFile : cnmtFiles) {
-        printf("Processing CNMT: %s\n", cnmtFile->name.c_str());
+        // Processing CNMT
         
         // Parse CNMT NCA ID
         NcmContentId cnmtNcaId;
         if (!parseNcaId(cnmtFile->name, cnmtNcaId)) {
-            printf("Warning: Could not parse CNMT NCA ID\n");
+            // Could not parse CNMT NCA ID
             continue;
         }
         
@@ -329,9 +382,8 @@ bool StreamInstaller::readCNMT() {
         cnmtInfo.size = cnmtFile->size;
         cnmtInfo.type = NcmContentType_Meta;
         
-        printf("Installing CNMT NCA first...\n");
+        // Install CNMT NCA first
         if (!installNCA(cnmtInfo)) {
-            printf("Warning: Failed to install CNMT NCA\n");
             continue;
         }
         
@@ -588,54 +640,66 @@ bool StreamInstaller::registerContentMeta(const NcmContentInfo& cnmtContentInfo)
     // Push application record
     uint64_t baseTitleId = ContentMetaUtil::getBaseTitleId(metaKey.id, 
                                                            static_cast<NcmContentMetaType>(metaKey.type));
-    printf("Base TitleID: %016lX\n", baseTitleId);
     
-    // Create content storage record (must match Awoo's ContentStorageRecord)
+    const char* typeStr = "Unknown";
+    switch (metaKey.type) {
+        case NcmContentMetaType_Application: typeStr = "Base Game"; break;
+        case NcmContentMetaType_Patch: typeStr = "Update"; break;
+        case NcmContentMetaType_AddOnContent: typeStr = "DLC"; break;
+        default: break;
+    }
+    printf("Registering %s: TitleID=%016lX -> BaseTitleID=%016lX\n", 
+           typeStr, metaKey.id, baseTitleId);
+    
+    // Create content storage record (matches system's ContentStorageRecord)
     struct ContentStorageRecord {
         NcmContentMetaKey key;
         u8 storage_id;
         u8 padding[7];
-    } storageRecord;
+    } __attribute__((packed)) storageRecord;
     
     memset(&storageRecord, 0, sizeof(storageRecord));
     storageRecord.key.id = metaKey.id;
     storageRecord.key.version = metaKey.version;
     storageRecord.key.type = metaKey.type;
+    storageRecord.key.install_type = 0;
     storageRecord.storage_id = m_destStorage;
     
-    // Get IApplicationManagerInterface
+    // Use IApplicationManagerInterface to push application record
+    // This is the low-level way that works in libnx
     Service appManSrv;
     rc = nsGetApplicationManagerInterface(&appManSrv);
     if (R_FAILED(rc)) {
         printf("Warning: Failed to get ApplicationManagerInterface: 0x%X\n", rc);
         printf("Game may not appear until reboot\n");
-    } else {
-        // Try to delete existing record first (cmd 5 = DeleteApplicationRecord)
-        rc = serviceDispatchIn(&appManSrv, 5, baseTitleId);
-        printf("DeleteApplicationRecord: 0x%X (ignore if not found)\n", rc);
-        
-        // Push application record (cmd 16 = PushApplicationRecord)
-        // In: u8 last_modified_event, u64 application_id
-        struct {
-            u8 last_modified_event;
-            u8 padding[7];
-            u64 application_id;
-        } pushIn = { 0x3, {0}, baseTitleId }; // 0x3 = Installed
-        
-        rc = serviceDispatchIn(&appManSrv, 16, pushIn,
-            .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In },
-            .buffers = { { &storageRecord, sizeof(storageRecord) } },
-        );
-        
-        if (R_FAILED(rc)) {
-            printf("Warning: Failed to push application record: 0x%X\n", rc);
-            printf("Game may not appear until reboot\n");
-        } else {
-            printf("Application record pushed successfully!\n");
-        }
-        
-        serviceClose(&appManSrv);
+        return true; // Not fatal - game is installed, just may need reboot
     }
+    
+    // CRITICAL FIX: Do NOT delete existing application record!
+    // The old code deleted the base title record, which caused DLC to overwrite base games.
+    // We now ONLY push/update the record without deleting.
+    
+    // Push application record (cmd 16 = PushApplicationRecord)
+    // This appends/updates the record without removing existing ones
+    struct {
+        u8 last_modified_event;
+        u8 padding[7];
+        u64 application_id;
+    } pushIn = { 0x3, {0}, baseTitleId }; // 0x3 = Installed
+    
+    rc = serviceDispatchIn(&appManSrv, 16, pushIn,
+        .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In },
+        .buffers = { { &storageRecord, sizeof(storageRecord) } },
+    );
+    
+    if (R_FAILED(rc)) {
+        printf("Warning: Failed to push application record: 0x%X\n", rc);
+        printf("Game may not appear until reboot\n");
+    } else {
+        printf("✓ Application record registered successfully!\n");
+    }
+    
+    serviceClose(&appManSrv);
     
     printf("Content meta registered successfully!\n");
     return true;
@@ -669,10 +733,12 @@ bool StreamInstaller::install(const std::string& nspName, uint64_t nspSize, Inst
         return false;
     }
     
-    // Install tickets and certificates first
-    printf("\nInstalling tickets...\n");
+    // IMPORTANT: Install tickets BEFORE NCAs (like Awoo Installer does)
+    // This ensures the system recognizes the rights before installing content
+    printf("\nInstalling tickets and certificates...\n");
     if (!installTicketCert()) {
-        return false;
+        // Ticket installation failure is not fatal - continue anyway
+        printf("Warning: Ticket installation had issues, but continuing...\n");
     }
     
     // Install each NCA
@@ -683,6 +749,18 @@ bool StreamInstaller::install(const std::string& nspName, uint64_t nspSize, Inst
         }
     }
     
+    // Final commit to ensure all changes are persisted
+    printf("\nFinalizing installation...\n");
+    Result rc = ncmContentMetaDatabaseCommit(&m_contentMetaDb);
+    if (R_FAILED(rc)) {
+        printf("Warning: Final database commit failed (0x%X)\n", rc);
+        // Not fatal - data should already be committed
+    }
+    
     printf("\n=== Installation Complete! ===\n");
+    printf("Game should now appear in your home menu.\n");
+    printf("If it doesn't appear, try rebooting your Switch.\n");
+    
     return true;
 }
+

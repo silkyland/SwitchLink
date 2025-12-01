@@ -28,13 +28,7 @@ bool ContentMeta::parse(const uint8_t* data, size_t size) {
     // Read header
     memcpy(&m_header, data, sizeof(PackagedContentMetaHeader));
     
-    printf("CNMT Header:\n");
-    printf("  Title ID: %016lX\n", m_header.titleId);
-    printf("  Version: %u\n", m_header.version);
-    printf("  Type: %u\n", m_header.type);
-    printf("  Extended Header Size: %u\n", m_header.extendedHeaderSize);
-    printf("  Content Count: %u\n", m_header.contentCount);
-    printf("  Content Meta Count: %u\n", m_header.contentMetaCount);
+    // CNMT parsed successfully
     
     // Read extended header
     size_t offset = sizeof(PackagedContentMetaHeader);
@@ -62,14 +56,7 @@ bool ContentMeta::parse(const uint8_t* data, size_t size) {
         uint8_t contentType = static_cast<uint8_t>(packagedInfo.info.content_type);
         if (contentType <= 5) {
             m_contentInfos.push_back(packagedInfo.info);
-            
-            // Calculate size from size_low (u32) and size_high (u8)
-            uint64_t contentSize = (uint64_t)packagedInfo.info.size_low | 
-                                   ((uint64_t)packagedInfo.info.size_high << 32);
-            
-            printf("  Content[%u]: type=%u, size=%lu, id=%s\n", 
-                   i, contentType, contentSize,
-                   ContentMetaUtil::contentIdToString(packagedInfo.info.content_id).c_str());
+            // Content parsed
         }
     }
     
@@ -161,7 +148,7 @@ bool ContentMeta::createInstallContentMeta(std::vector<uint8_t>& outBuffer,
         }
     }
     
-    printf("Created install content meta: %zu bytes\n", outBuffer.size());
+    // Install content meta created
     return true;
 }
 
