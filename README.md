@@ -2,7 +2,9 @@
 
 High-performance Nintendo Switch file transfer system with modern GUI.
 
-> **Inspired by open source installers** - A clean, modern Nintendo Switch installer
+![SwitchLink Screenshot](assets/screenshot.png)
+
+> **Inspired by [DBI](https://github.com/rashevskyv/dbi)** - The original Nintendo Switch installer
 
 ## ✨ Features
 
