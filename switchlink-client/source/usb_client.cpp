@@ -44,7 +44,7 @@ bool USBClient::sendCommand(uint32_t type, uint32_t cmdId, uint32_t length) {
     if (!m_connected) return false;
     
     ProtocolHeader header;
-    header.magic = PROTOCOL_MAGIC_DBI;
+    header.magic = PROTOCOL_MAGIC_SWLK;
     header.type = type;
     header.command = cmdId;
     header.length = length;
@@ -121,7 +121,7 @@ std::vector<FileInfo> USBClient::listFiles() {
     
 
     
-    if (header.magic != PROTOCOL_MAGIC_DBI && header.magic != PROTOCOL_MAGIC_SWLK) {
+    if (header.magic != PROTOCOL_MAGIC_LEGACY && header.magic != PROTOCOL_MAGIC_SWLK) {
 
         return files;
     }
@@ -142,7 +142,7 @@ std::vector<FileInfo> USBClient::listFiles() {
     // Send ACK
 
     ProtocolHeader ack;
-    ack.magic = PROTOCOL_MAGIC_DBI;
+    ack.magic = PROTOCOL_MAGIC_SWLK;
     ack.type = CMD_TYPE_ACK;
     ack.command = static_cast<uint32_t>(Command::LIST);
     ack.length = list_len;
@@ -274,7 +274,7 @@ bool USBClient::downloadFile(const std::string& filename, const std::string& des
             break;
         }
         
-        if (ack.magic != PROTOCOL_MAGIC_DBI && ack.magic != PROTOCOL_MAGIC_SWLK) {
+        if (ack.magic != PROTOCOL_MAGIC_LEGACY && ack.magic != PROTOCOL_MAGIC_SWLK) {
 
             success = false;
             break;
