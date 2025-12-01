@@ -957,27 +957,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
-name = "dbi-backend-rust"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "dirs",
- "eframe",
- "egui",
- "egui_extras",
- "open",
- "rfd",
- "rusb",
- "rusqlite",
- "serde",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3303,6 +3282,27 @@ name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
+
+[[package]]
+name = "switchlink-backend"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "dirs",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "open",
+ "rfd",
+ "rusb",
+ "rusqlite",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "syn"

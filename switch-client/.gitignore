@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+*.elf
+*.nacp
+*.nro
+
+# Hacbrewpack artifacts
+hacbrewpack_nca/
+hacbrewpack_nsp/
+hacbrewpack_temp/
+exefs/
+control/
+
+# Keys
+keys.dat
+*.keys
+
+# Rust artifacts (not used)
+Cargo.toml
+Cargo.lock
+target/
+
+# Build scripts (not used)
+build-switch.sh
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

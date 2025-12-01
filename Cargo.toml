@@ -1,12 +1,12 @@
 [package]
-name = "dbi-backend-rust"
-version = "0.1.0"
+name = "switchlink-backend"
+version = "1.0.0"
 edition = "2021"
 authors = ["Bundit Nuntates <bundit.nu@gmail.com>"]
 license = "MIT"
-description = "High-performance Nintendo Switch DBI backend with modern GUI"
-repository = "https://github.com/silkyland/dbi-server-rust"
-keywords = ["nintendo-switch", "dbi", "usb", "gui", "installer"]
+description = "SwitchLink - High-performance Nintendo Switch file transfer backend (inspired by DBI)"
+repository = "https://github.com/silkyland/switchlink"
+keywords = ["nintendo-switch", "switchlink", "usb", "gui", "file-transfer"]
 categories = ["games", "gui"]
 
 [dependencies]

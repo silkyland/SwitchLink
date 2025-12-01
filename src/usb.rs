@@ -168,14 +168,14 @@ impl UsbConnection {
     }
 }
 
-pub struct DbiServer {
+pub struct SwitchLinkServer {
     connection: Option<UsbConnection>,
     file_list: Arc<Mutex<HashMap<String, PathBuf>>>,
     running: Arc<Mutex<bool>>,
     progress: Option<Arc<Mutex<TransferProgress>>>,
 }
 
-impl DbiServer {
+impl SwitchLinkServer {
     pub fn new(file_list: Arc<Mutex<HashMap<String, PathBuf>>>) -> Self {
         Self {
             connection: None,
@@ -212,7 +212,7 @@ impl DbiServer {
         }
         
         *self.running.lock().unwrap() = true;
-        info!("DBI Server started, entering command loop");
+        info!("SwitchLink Server started, entering command loop");
         
         self.poll_commands()
     }
@@ -220,7 +220,7 @@ impl DbiServer {
     pub fn stop(&mut self) {
         *self.running.lock().unwrap() = false;
         self.connection = None;
-        info!("DBI Server stopped");
+        info!("SwitchLink Server stopped");
     }
     
     fn poll_commands(&mut self) -> Result<()> {
@@ -332,8 +332,18 @@ impl DbiServer {
         let file_list = self.file_list.lock().unwrap();
         
         let mut nsp_path_list = String::new();
-        for (name, _) in file_list.iter() {
+        for (name, path) in file_list.iter() {
+            // Get file size
+            let size = if let Ok(metadata) = std::fs::metadata(path) {
+                metadata.len()
+            } else {
+                0
+            };
+            
+            // Format: filename|size\n
             nsp_path_list.push_str(name);
+            nsp_path_list.push('|');
+            nsp_path_list.push_str(&size.to_string());
             nsp_path_list.push('\n');
         }
         
@@ -390,14 +400,44 @@ impl DbiServer {
             file_range.nsp_name, file_range.range_offset, file_range.range_size
         );
         
-        // Send response
+        // Calculate actual size to send BEFORE sending response header
+        let file_list = self.file_list.lock().unwrap();
+        let file_path = match file_list.get(&file_range.nsp_name) {
+            Some(path) => path.clone(),
+            None => {
+                error!("File not found: {}", file_range.nsp_name);
+                // Send response with 0 bytes to signal error
+                let response = CommandHeader::new(CMD_TYPE_RESPONSE, CMD_ID_FILE_RANGE, 0);
+                conn.write_command_header(&response)?;
+                return Err(anyhow!("File not found"));
+            }
+        };
+        drop(file_list); // Release lock early
+        
+        // Get file size and calculate actual bytes to send
+        let metadata = std::fs::metadata(&file_path)?;
+        let file_size = metadata.len();
+        let offset = file_range.range_offset;
+        let requested_size = file_range.range_size as usize;
+        
+        let actual_size = if offset >= file_size {
+            0 // No more data to send
+        } else {
+            let available = (file_size - offset) as usize;
+            std::cmp::min(requested_size, available)
+        };
+        
+        info!("Calculated actual_size={} (requested={}, available from offset {})", 
+              actual_size, requested_size, offset);
+        
+        // Send response with ACTUAL size (not requested size)
         let response = CommandHeader::new(
             CMD_TYPE_RESPONSE,
             CMD_ID_FILE_RANGE,
-            file_range.range_size,
+            actual_size as u32,
         );
         conn.write_command_header(&response)?;
-        info!("Sent FILE_RANGE response header");
+        info!("Sent FILE_RANGE response header with size={}", actual_size);
         
         // Wait for ACK with longer timeout
         info!("Waiting for ACK from Switch...");
@@ -410,31 +450,17 @@ impl DbiServer {
                 if p.current_file != file_range.nsp_name {
                     p.current_file = file_range.nsp_name.clone();
                     p.bytes_sent = 0;
-                    
-                    // Get file size for total
-                    let file_list = self.file_list.lock().unwrap();
-                    if let Some(file_path) = file_list.get(&file_range.nsp_name) {
-                        if let Ok(metadata) = std::fs::metadata(file_path) {
-                            p.total_size = metadata.len();
-                        }
-                    }
-                    
+                    p.total_size = file_size;
                     p.add_log(format!("[>] Transferring: {}", file_range.nsp_name));
                 }
             }
         }
         
-        // Send file data
-        let file_list = self.file_list.lock().unwrap();
-        if let Some(file_path) = file_list.get(&file_range.nsp_name) {
-            self.send_file_range(
-                file_path,
-                file_range.range_offset,
-                file_range.range_size as usize,
-            )?;
+        // Send file data (only if there's data to send)
+        if actual_size > 0 {
+            self.send_file_range(&file_path, offset, actual_size)?;
         } else {
-            error!("File not found: {}", file_range.nsp_name);
-            return Err(anyhow!("File not found"));
+            info!("No data to send (offset {} >= file_size {})", offset, file_size);
         }
         
         Ok(())
@@ -448,42 +474,21 @@ impl DbiServer {
     ) -> Result<()> {
         let conn = self.connection.as_ref().unwrap();
         
-        // Get file metadata to check size
-        let metadata = std::fs::metadata(file_path)?;
-        let file_size = metadata.len();
-        
-        debug!("File size: {}, requested offset: {}, requested size: {}", 
-               file_size, offset, size);
-        
-        // Check if offset is beyond file size
-        if offset >= file_size {
-            warn!("Offset {} is beyond file size {}, sending 0 bytes", offset, file_size);
-            info!("File transfer complete: 0 bytes sent (requested: {}, available: 0)", size);
-            return Ok(());
-        }
-        
+        // Size is already calculated correctly by process_file_range_command
+        // Just open file and send the exact number of bytes
         let mut file = File::open(file_path)?;
         file.seek(SeekFrom::Start(offset))?;
-        
-        // Adjust size if it would read beyond file end
-        let available = (file_size - offset) as usize;
-        let actual_size = std::cmp::min(size, available);
-        
-        if actual_size < size {
-            warn!("Requested {} bytes but only {} bytes available from offset {}", 
-                  size, actual_size, offset);
-        }
         
         let mut curr_off = 0;
         let mut buffer = vec![0u8; BUFFER_SEGMENT_DATA_SIZE];
         
-        while curr_off < actual_size {
-            let read_size = std::cmp::min(BUFFER_SEGMENT_DATA_SIZE, actual_size - curr_off);
+        while curr_off < size {
+            let read_size = std::cmp::min(BUFFER_SEGMENT_DATA_SIZE, size - curr_off);
             let bytes_read = file.read(&mut buffer[..read_size])?;
             
             if bytes_read == 0 {
                 warn!("Unexpected EOF at offset {}, sent {} / {} bytes", 
-                      offset + curr_off as u64, curr_off, actual_size);
+                      offset + curr_off as u64, curr_off, size);
                 break;
             }
             
@@ -499,12 +504,11 @@ impl DbiServer {
             }
             
             if curr_off % (10 * 1024 * 1024) == 0 {
-                debug!("Sent {} / {} bytes", curr_off, actual_size);
+                debug!("Sent {} / {} bytes", curr_off, size);
             }
         }
         
-        info!("File transfer complete: {} bytes sent (requested: {}, available: {})", 
-              curr_off, size, actual_size);
+        info!("File transfer complete: {} bytes sent", curr_off);
         Ok(())
     }
 }
