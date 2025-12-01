@@ -18,17 +18,15 @@ bool PFS0::initialize(DataReadCallback readCallback, uint64_t totalSize) {
     // Read PFS0 header
     PFS0Header header;
     if (!m_readCallback(0, sizeof(header), &header)) {
-        printf("Failed to read PFS0 header\n");
         return false;
     }
     
     // Verify magic
     if (header.magic != PFS0_MAGIC) {
-        printf("Invalid PFS0 magic: 0x%08X (expected 0x%08X)\n", header.magic, PFS0_MAGIC);
         return false;
     }
     
-    printf("PFS0: %u files, string table size: %u\n", header.numFiles, header.stringTableSize);
+
     
     // Calculate offsets
     uint64_t fileEntriesOffset = sizeof(PFS0Header);
@@ -39,7 +37,6 @@ bool PFS0::initialize(DataReadCallback readCallback, uint64_t totalSize) {
     std::vector<PFS0FileEntry> entries(header.numFiles);
     if (header.numFiles > 0) {
         if (!m_readCallback(fileEntriesOffset, header.numFiles * sizeof(PFS0FileEntry), entries.data())) {
-            printf("Failed to read file entries\n");
             return false;
         }
     }
@@ -48,7 +45,6 @@ bool PFS0::initialize(DataReadCallback readCallback, uint64_t totalSize) {
     std::vector<char> stringTable(header.stringTableSize + 1);
     if (header.stringTableSize > 0) {
         if (!m_readCallback(stringTableOffset, header.stringTableSize, stringTable.data())) {
-            printf("Failed to read string table\n");
             return false;
         }
     }
@@ -62,7 +58,7 @@ bool PFS0::initialize(DataReadCallback readCallback, uint64_t totalSize) {
         info.size = entries[i].dataSize;
         m_files.push_back(info);
         
-        printf("  [%u] %s (offset: 0x%lX, size: %lu)\n", i, info.name.c_str(), info.offset, info.size);
+
     }
     
     m_initialized = true;

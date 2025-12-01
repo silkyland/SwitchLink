@@ -7,9 +7,9 @@
 #include <functional>
 
 // Protocol constants
-// Support both SwitchLink (new) and DBI (backward compatible)
+// Protocol Magic Numbers
 constexpr uint32_t PROTOCOL_MAGIC_SWLK = 0x4B4C5753; // "SWLK" (SwitchLink)
-constexpr uint32_t PROTOCOL_MAGIC_DBI = 0x30494244;  // "DBI0" (backward compatible)
+constexpr uint32_t PROTOCOL_MAGIC_LEGACY = 0x30494244;  // "DBI0" (Legacy support)
 constexpr uint16_t PROTOCOL_VERSION = 1;
 
 // Command types

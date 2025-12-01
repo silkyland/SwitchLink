@@ -646,9 +646,7 @@ bool StreamInstaller::install(const std::string& nspName, uint64_t nspSize, Inst
     m_installedSize = 0;
     m_lastError.clear();
     
-    printf("\n=== Installing: %s ===\n", nspName.c_str());
-    printf("Size: %lu bytes\n", nspSize);
-    printf("Destination: %s\n", m_destStorage == NcmStorageId_SdCard ? "SD Card" : "NAND");
+
     
     // Initialize services
     if (!initializeServices()) {
@@ -656,27 +654,27 @@ bool StreamInstaller::install(const std::string& nspName, uint64_t nspSize, Inst
     }
     
     // Parse NSP structure
-    printf("\nParsing NSP structure...\n");
+
     if (!parseNSP()) {
         return false;
     }
     
     // Read content list from CNMT
-    printf("\nReading content metadata...\n");
+
     if (!readCNMT()) {
         return false;
     }
     
     // IMPORTANT: Install tickets BEFORE NCAs (like Awoo Installer does)
     // This ensures the system recognizes the rights before installing content
-    printf("\nInstalling tickets and certificates...\n");
+
     if (!installTicketCert()) {
         // Ticket installation failure is not fatal - continue anyway
-        printf("Warning: Ticket installation had issues, but continuing...\n");
+
     }
     
     // Install each NCA
-    printf("\nInstalling NCAs...\n");
+
     for (const auto& content : m_contents) {
         if (!installNCA(content)) {
             return false;
@@ -684,16 +682,14 @@ bool StreamInstaller::install(const std::string& nspName, uint64_t nspSize, Inst
     }
     
     // Final commit to ensure all changes are persisted
-    printf("\nFinalizing installation...\n");
+
     Result rc = ncmContentMetaDatabaseCommit(&m_contentMetaDb);
     if (R_FAILED(rc)) {
-        printf("Warning: Final database commit failed (0x%X)\n", rc);
+
         // Not fatal - data should already be committed
     }
     
-    printf("\n=== Installation Complete! ===\n");
-    printf("Game should now appear in your home menu.\n");
-    printf("If it doesn't appear, try rebooting your Switch.\n");
+
     
     return true;
 }

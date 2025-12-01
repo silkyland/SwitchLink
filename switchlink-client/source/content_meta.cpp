@@ -18,7 +18,6 @@ bool ContentMeta::parse(const uint8_t* data, size_t size) {
     m_rawData.clear();
     
     if (size < sizeof(PackagedContentMetaHeader)) {
-        printf("CNMT data too small: %zu bytes\n", size);
         return false;
     }
     
@@ -34,7 +33,6 @@ bool ContentMeta::parse(const uint8_t* data, size_t size) {
     size_t offset = sizeof(PackagedContentMetaHeader);
     if (m_header.extendedHeaderSize > 0) {
         if (offset + m_header.extendedHeaderSize > size) {
-            printf("Extended header exceeds data size\n");
             return false;
         }
         m_extendedHeader.assign(data + offset, data + offset + m_header.extendedHeaderSize);
@@ -44,7 +42,6 @@ bool ContentMeta::parse(const uint8_t* data, size_t size) {
     // Read content infos
     for (uint16_t i = 0; i < m_header.contentCount; i++) {
         if (offset + sizeof(NcmPackagedContentInfo) > size) {
-            printf("Content info %u exceeds data size\n", i);
             return false;
         }
         

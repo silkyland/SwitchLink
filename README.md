@@ -2,11 +2,14 @@
 
 High-performance Nintendo Switch file transfer system with modern GUI.
 
+![SwitchLink Screenshot](assets/screenshot.png)
+
 > **Inspired by [DBI](https://github.com/rashevskyv/dbi)** - The original Nintendo Switch installer
 
 ## ✨ Features
 
 ### Backend (PC)
+
 - 🚀 **Fast Transfers** - ~45 MB/s over USB
 - 🎨 **Modern GUI** - Beautiful dark theme with card-based design
 - 📁 **File Library** - Database-backed with favorites and search
@@ -14,6 +17,7 @@ High-performance Nintendo Switch file transfer system with modern GUI.
 - 🔄 **Queue System** - Batch transfer multiple files
 
 ### Client (Nintendo Switch)
+
 - 📱 **Clean UI** - ANSI-based terminal interface
 - ⬇️ **Fast Downloads** - 1MB chunk transfers
 - ❌ **Cancel Support** - Press B to cancel with confirmation
@@ -24,6 +28,7 @@ High-performance Nintendo Switch file transfer system with modern GUI.
 ### Prerequisites
 
 **PC (Backend):**
+
 ```bash
 # Linux
 sudo apt-get install libusb-1.0-0-dev
@@ -34,6 +39,7 @@ cargo build --release
 ```
 
 **Nintendo Switch (Client):**
+
 1. Download `switchlink-client.nro` from [Releases](https://github.com/silkyland/switchlink/releases)
 2. Copy to `/switch/` folder on SD card
 3. Launch from Homebrew Menu
@@ -49,13 +55,13 @@ cargo build --release
 
 Get the latest release from [GitHub Releases](https://github.com/silkyland/switchlink/releases):
 
-| Platform | File |
-|----------|------|
-| Linux | `switchlink-backend-linux-x64` |
-| Windows | `switchlink-backend-windows-x64.exe` |
-| macOS Intel | `switchlink-backend-macos-x64` |
-| macOS ARM | `switchlink-backend-macos-arm64` |
-| Nintendo Switch | `switchlink-client.nro` |
+| Platform        | File                                 |
+| --------------- | ------------------------------------ |
+| Linux           | `switchlink-backend-linux-x64`       |
+| Windows         | `switchlink-backend-windows-x64.exe` |
+| macOS Intel     | `switchlink-backend-macos-x64`       |
+| macOS ARM       | `switchlink-backend-macos-arm64`     |
+| Nintendo Switch | `switchlink-client.nro`              |
 
 ## 🏗️ Project Structure
 
@@ -78,11 +84,13 @@ switchlink/
 ## 🔧 Building from Source
 
 ### Backend
+
 ```bash
 cargo build --release
 ```
 
 ### Switch Client
+
 ```bash
 # Requires devkitPro
 cd switch-client

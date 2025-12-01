@@ -1,7 +1,7 @@
-# Nintendo Switch USB Rules for DBI Backend
+# Nintendo Switch USB Rules for SwitchLink Backend
 # This allows non-root users to access Nintendo Switch via USB
 
-# Nintendo Switch in DBI mode
+# Nintendo Switch in SwitchLink mode
 SUBSYSTEM=="usb", ATTR{idVendor}=="057e", ATTR{idProduct}=="3000", MODE="0666"
 
 # Nintendo Switch (general)
